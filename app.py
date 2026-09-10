@@ -127,8 +127,7 @@ elif page == "➕ New Case":
             "Critical"
         ]
     )
-
-   if st.button("Create Case"):
+if st.button("Create Case"):
 
     if patient_name == "":
         st.warning("Please enter a Patient ID / Name.")

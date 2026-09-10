@@ -203,27 +203,55 @@ elif page == "➕ New Case":
 
 # ---------------- CASES ----------------
 
-elif page == "📁 Cases":
+elif page == "Cases":
 
     st.title("📁 Cases")
+    st.write("View and manage clinical cases.")
 
-    if len(st.session_state.cases) == 0:
+    # Search
+    search = st.text_input("🔍 Search by Patient ID")
 
-        st.info("No cases have been created yet.")
+    # Filter
+    urgency_filter = st.selectbox(
+        "Filter by Urgency",
+        ["All", "CRITICAL", "URGENT", "MODERATE", "ROUTINE"]
+    )
+
+    filtered_cases = st.session_state.cases
+
+    # Search filtering
+    if search:
+        filtered_cases = [
+            case for case in filtered_cases
+            if search.lower() in case["Patient ID"].lower()
+        ]
+
+    # Urgency filtering
+    if urgency_filter != "All":
+        filtered_cases = [
+            case for case in filtered_cases
+            if case["Urgency"] == urgency_filter
+        ]
+
+    # Display cases
+    if len(filtered_cases) == 0:
+
+        st.info("No cases found.")
 
     else:
 
-        for i, case in enumerate(st.session_state.cases):
+        for case in filtered_cases:
 
-            st.subheader("Case " + str(i + 1))
+            with st.expander(
+                f"Patient {case['Patient ID']} — {case['Urgency']}"
+            ):
 
-            st.write("Patient ID:", case["patient"])
-            st.write("Age:", case["age"])
-            st.write("Health Problem:", case["health_problem"])
-            st.write("Clinical Information:", case["clinical_info"])
-            st.write("Urgency:", case["urgency"])
-
-            st.divider()
+                st.write("**Patient ID:**", case["Patient ID"])
+                st.write("**Age:**", case["Age"])
+                st.write("**Health Problem:**", case["Health Problem"])
+                st.write("**Clinical Information:**", case["Clinical Information"])
+                st.write("**Urgency:**", case["Urgency"])
+                st.write("**Status:**", case["Status"])
 
 
 # ---------------- OTHER PAGES ----------------

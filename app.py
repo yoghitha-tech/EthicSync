@@ -570,34 +570,273 @@ elif page == "AI Decision Support":
     st.title("🤖 AI Decision Support")
 
     st.write(
-        "AI-assisted clinical decision support."
+        "AI-assisted analysis of clinical cases and decision options."
     )
 
-    st.info(
-        "AI analysis module will be connected to case information next."
-    )
+    # Check whether cases exist
+    if len(st.session_state.cases) == 0:
 
-    st.write("Planned features:")
+        st.info(
+            "No cases available. Please create a case first."
+        )
 
-    st.write("• Clinical information analysis")
+    else:
 
-    st.write("• Ethical issue identification")
+        # Select case
+        patient_ids = []
 
-    st.write("• Option comparison")
+        for case in st.session_state.cases:
+            patient_ids.append(case["Patient ID"])
 
-    st.write("• Evidence-based decision support")
+        selected_patient = st.selectbox(
+            "Select Patient Case",
+            patient_ids
+        )
 
-    st.write("• Similar-case analysis")
+        # Find selected case
+        selected_case = None
 
-    st.write("• AI-suggested option")
+        for case in st.session_state.cases:
 
-    st.write("• Reasoning and explanation")
+            if case["Patient ID"] == selected_patient:
+                selected_case = case
 
-    st.write("• Uncertainty indication")
+        st.divider()
 
-    st.caption(
-        "AI output should support—not replace—qualified human decision-making."
-    )
+        # ------------------------------------------
+        # CASE INFORMATION
+        # ------------------------------------------
+
+        st.subheader("📋 Case Information")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.write(
+                "**Patient ID:**",
+                selected_case["Patient ID"]
+            )
+
+        with col2:
+            st.write(
+                "**Age:**",
+                selected_case["Age"]
+            )
+
+        with col3:
+            st.write(
+                "**Urgency:**",
+                selected_case["Urgency"]
+            )
+
+        st.write(
+            "**Health Problem:**",
+            selected_case["Health Problem"]
+        )
+
+        st.write(
+            "**Clinical Information:**",
+            selected_case["Clinical Information"]
+        )
+
+        # ------------------------------------------
+        # ETHICAL ISSUE
+        # ------------------------------------------
+
+        st.subheader("⚖️ Ethical Issue")
+
+        if selected_case["Ethical Issue"]:
+
+            st.warning(
+                selected_case["Ethical Issue"]
+            )
+
+        else:
+
+            st.info(
+                "No ethical issue has been recorded."
+            )
+
+        # ------------------------------------------
+        # DECISION OPTIONS
+        # ------------------------------------------
+
+        st.subheader("💡 Clinical Decision Options")
+
+        options_text = selected_case["Decision Options"]
+
+        if options_text:
+
+            options = options_text.split("\n")
+
+            for i, option in enumerate(options):
+
+                if option.strip():
+
+                    st.write(
+                        str(i + 1) + ". " + option
+                    )
+
+        else:
+
+            options = []
+
+            st.info(
+                "No decision options have been entered."
+            )
+
+        # ------------------------------------------
+        # AI ANALYSIS
+        # ------------------------------------------
+
+        if st.button("🤖 Analyze Case"):
+
+            st.divider()
+
+            st.subheader("🧠 AI Analysis")
+
+            urgency = selected_case["Urgency"]
+
+            clinical_text = selected_case[
+                "Clinical Information"
+            ].lower()
+
+            # Basic prototype reasoning
+            if urgency == "CRITICAL":
+
+                recommendation = (
+                    "Prioritize immediate clinical review "
+                    "and the safest available intervention."
+                )
+
+                reasoning = (
+                    "The case has been classified as CRITICAL. "
+                    "The system therefore prioritizes patient safety "
+                    "and immediate human clinical review."
+                )
+
+                confidence = "High urgency signal"
+
+            elif urgency == "URGENT":
+
+                recommendation = (
+                    "Prioritize timely clinical intervention "
+                    "with human review."
+                )
+
+                reasoning = (
+                    "The case has been classified as URGENT. "
+                    "The system recommends priority review "
+                    "before a final decision is made."
+                )
+
+                confidence = "Moderate-high urgency signal"
+
+            elif urgency == "MODERATE":
+
+                recommendation = (
+                    "Review available options and obtain "
+                    "additional clinical information if required."
+                )
+
+                reasoning = (
+                    "The case has a MODERATE urgency level. "
+                    "Additional clinical review can help "
+                    "differentiate between available options."
+                )
+
+                confidence = "Moderate urgency signal"
+
+            else:
+
+                recommendation = (
+                    "Proceed with routine clinical review "
+                    "and compare available options."
+                )
+
+                reasoning = (
+                    "The case has been classified as ROUTINE. "
+                    "The system recommends standard review "
+                    "of the available decision options."
+                )
+
+                confidence = "Routine urgency signal"
+
+            # --------------------------------------
+            # RESULTS
+            # --------------------------------------
+
+            st.success(
+                "Suggested Decision Approach"
+            )
+
+            st.write(
+                recommendation
+            )
+
+            st.subheader("Why?")
+
+            st.write(
+                reasoning
+            )
+
+            st.subheader("📊 Uncertainty / Confidence")
+
+            st.info(
+                confidence
+            )
+
+            # --------------------------------------
+            # CLINICAL KEYWORD CHECK
+            # --------------------------------------
+
+            st.subheader(
+                "🔍 Clinical Information Analysis"
+            )
+
+            important_terms = [
+                "severe",
+                "critical",
+                "chest pain",
+                "breathing difficulty",
+                "shock",
+                "collapse",
+                "unconscious"
+            ]
+
+            detected = []
+
+            for term in important_terms:
+
+                if term in clinical_text:
+                    detected.append(term)
+
+            if len(detected) > 0:
+
+                st.warning(
+                    "Important clinical terms detected: "
+                    + ", ".join(detected)
+                )
+
+            else:
+
+                st.info(
+                    "No predefined high-risk keywords detected."
+                )
+
+            # --------------------------------------
+            # HUMAN REVIEW
+            # --------------------------------------
+
+            st.subheader(
+                "👨‍⚕️ Human Review"
+            )
+
+            st.warning(
+                "AI output is decision support only. "
+                "A qualified human decision-maker must "
+                "review and approve the final clinical decision."
+            )
 
 
 # ==================================================

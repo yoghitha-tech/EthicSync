@@ -132,9 +132,7 @@ elif page == "➕ New Case":
         ]
     )
     if st.button("Create Case"):
-
-    urgency_score = 0
-
+        urgency_score = 0
     if urgency == "Needs monitoring":
         urgency_score += 1
     elif urgency == "Deteriorating":

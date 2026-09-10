@@ -1,8 +1,9 @@
 import streamlit as st
+from datetime import datetime
 
-# --------------------------------------------------
-# PAGE SETTINGS
-# --------------------------------------------------
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
 
 st.set_page_config(
     page_title="EthicSync",
@@ -10,23 +11,39 @@ st.set_page_config(
     layout="wide"
 )
 
-# --------------------------------------------------
+# =========================================================
 # SESSION STATE
-# --------------------------------------------------
+# =========================================================
 
 if "cases" not in st.session_state:
     st.session_state.cases = []
 
+if "audit" not in st.session_state:
+    st.session_state.audit = []
 
-# --------------------------------------------------
-# URGENCY FUNCTION
-# --------------------------------------------------
 
-def calculate_urgency(clinical_info, clinical_status, time_sensitive):
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
+
+def add_audit(message):
+
+    st.session_state.audit.append(
+        {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "message": message
+        }
+    )
+
+
+def calculate_urgency(
+    clinical_info,
+    clinical_status,
+    time_sensitive
+):
 
     score = 0
 
-    # Clinical status
     if clinical_status == "Needs monitoring":
         score += 1
 
@@ -36,11 +53,9 @@ def calculate_urgency(clinical_info, clinical_status, time_sensitive):
     elif clinical_status == "Critical":
         score += 3
 
-    # Time sensitivity
     if time_sensitive == "Yes":
         score += 2
 
-    # Keywords
     keywords = [
         "severe",
         "unconscious",
@@ -54,10 +69,10 @@ def calculate_urgency(clinical_info, clinical_status, time_sensitive):
     text = clinical_info.lower()
 
     for word in keywords:
+
         if word in text:
             score += 2
 
-    # Final urgency
     if score >= 5:
         return "CRITICAL"
 
@@ -71,12 +86,149 @@ def calculate_urgency(clinical_info, clinical_status, time_sensitive):
         return "ROUTINE"
 
 
-# --------------------------------------------------
+# =========================================================
+# AUTOMATIC DECISION OPTIONS
+# =========================================================
+
+def generate_options(problem):
+
+    if "Respiratory" in problem:
+
+        return [
+            "Immediate clinical intervention",
+            "Additional investigation",
+            "Supportive monitoring"
+        ]
+
+    elif "Diabetes" in problem:
+
+        return [
+            "Treatment adjustment",
+            "Additional diagnostic assessment",
+            "Continued monitoring"
+        ]
+
+    elif "Cardiovascular" in problem:
+
+        return [
+            "Immediate cardiovascular management",
+            "Additional cardiac investigation",
+            "Continued monitoring"
+        ]
+
+    elif "Infectious" in problem:
+
+        return [
+            "Immediate clinical management",
+            "Additional diagnostic testing",
+            "Supportive monitoring"
+        ]
+
+    elif "Cancer" in problem:
+
+        return [
+            "Proceed with planned treatment",
+            "Additional clinical evaluation",
+            "Supportive management"
+        ]
+
+    elif "Neurological" in problem:
+
+        return [
+            "Immediate neurological assessment",
+            "Additional investigation",
+            "Continued observation"
+        ]
+
+    elif "Trauma" in problem:
+
+        return [
+            "Immediate trauma management",
+            "Additional diagnostic evaluation",
+            "Continued monitoring"
+        ]
+
+    else:
+
+        return [
+            "Immediate clinical management",
+            "Additional investigation",
+            "Conservative monitoring"
+        ]
+
+
+# =========================================================
+# MCDM SCORING
+# =========================================================
+
+def calculate_scores(urgency, options):
+
+    # Default criteria
+    weights = {
+        "Patient Safety": 40,
+        "Clinical Effectiveness": 30,
+        "Ethical Acceptability": 15,
+        "Resource Availability": 10,
+        "Patient Preference": 5
+    }
+
+    results = {}
+
+    for i, option in enumerate(options):
+
+        # Prototype scoring
+        if i == 0:
+
+            safety = 9
+            effectiveness = 9
+            ethics = 8
+            resources = 6
+            preference = 7
+
+        elif i == 1:
+
+            safety = 7
+            effectiveness = 7
+            ethics = 9
+            resources = 8
+            preference = 7
+
+        else:
+
+            safety = 5
+            effectiveness = 5
+            ethics = 8
+            resources = 9
+            preference = 6
+
+        # Critical cases prioritize safety
+        if urgency == "CRITICAL" and i == 0:
+
+            safety = 10
+            effectiveness = 10
+
+        score = (
+            safety * 0.40
+            + effectiveness * 0.30
+            + ethics * 0.15
+            + resources * 0.10
+            + preference * 0.05
+        )
+
+        results[option] = round(score * 10, 1)
+
+    return weights, results
+
+
+# =========================================================
 # SIDEBAR
-# --------------------------------------------------
+# =========================================================
 
 st.sidebar.title("⚕️ EthicSync")
-st.sidebar.write("Clinical Decision Support System")
+
+st.sidebar.write(
+    "Clinical Decision Support System"
+)
 
 page = st.sidebar.radio(
     "Navigation",
@@ -100,96 +252,115 @@ page = st.sidebar.radio(
 )
 
 
-# ==================================================
+# =========================================================
 # DASHBOARD
-# ==================================================
+# =========================================================
 
 if page == "Dashboard":
 
     st.title("🏠 Dashboard")
-    st.write("Overall case overview")
 
-    total_cases = len(st.session_state.cases)
+    st.write(
+        "Overall case overview"
+    )
 
-    urgent_cases = 0
+    total = len(st.session_state.cases)
 
-    pending_cases = 0
+    urgent = 0
+    pending = 0
+    critical = 0
 
     for case in st.session_state.cases:
 
-        if case["Urgency"] in ["CRITICAL", "URGENT"]:
-            urgent_cases += 1
+        if case["Urgency"] in [
+            "URGENT",
+            "CRITICAL"
+        ]:
+            urgent += 1
+
+        if case["Urgency"] == "CRITICAL":
+            critical += 1
 
         if case["Status"] == "Pending Review":
-            pending_cases += 1
+            pending += 1
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
             "Active Cases",
-            total_cases
+            total
         )
 
     with col2:
         st.metric(
             "Pending Reviews",
-            pending_cases
+            pending
         )
 
     with col3:
         st.metric(
             "Urgent Cases",
-            urgent_cases
+            urgent
         )
 
     with col4:
         st.metric(
-            "Consensus Status",
-            "78%"
+            "Critical Cases",
+            critical
         )
 
     st.divider()
 
     st.subheader("🔔 Notifications")
 
-    if urgent_cases > 0:
-        st.warning(
-            str(urgent_cases) +
-            " urgent/critical case(s) require priority review."
+    if critical > 0:
+
+        st.error(
+            "🚨 Critical case requires human clinical review."
         )
+
+    elif urgent > 0:
+
+        st.warning(
+            "⚠️ Urgent case requires priority review."
+        )
+
     else:
-        st.success("No urgent cases currently flagged.")
+
+        st.success(
+            "No urgent notifications."
+        )
 
     st.subheader("🕒 Recent Activity")
 
-    if total_cases == 0:
-        st.info("No cases created yet.")
+    if len(st.session_state.audit) == 0:
+
+        st.info(
+            "No recent activity."
+        )
 
     else:
 
-        for case in st.session_state.cases[-5:]:
+        for activity in st.session_state.audit[-5:]:
 
             st.write(
-                "Patient "
-                + case["Patient ID"]
+                activity["time"]
                 + " — "
-                + case["Urgency"]
-                + " — "
-                + case["Status"]
+                + activity["message"]
             )
 
 
-# ==================================================
+# =========================================================
 # NEW CASE
-# ==================================================
+# =========================================================
 
 elif page == "New Case":
 
     st.title("➕ New Case")
 
     st.write(
-        "Create a new clinical case for decision support."
+        "Create a new clinical case."
     )
 
     st.subheader("Patient Information")
@@ -260,101 +431,130 @@ elif page == "New Case":
         ]
     )
 
-    st.subheader("Case Description")
-
-    case_description = st.text_area(
-        "Describe the case"
-    )
-
-    st.subheader("Clinical Decision Options")
-
-    decision_options = st.text_area(
-        "Enter possible clinical decision options"
-    )
-
     st.subheader("Ethical Issue")
 
     ethical_issue = st.text_area(
-        "Describe any ethical issue"
+        "Describe any ethical concern"
     )
 
     if st.button("Create Case"):
 
         if patient_id == "":
-            st.error("Please enter a Patient ID.")
+
+            st.error(
+                "Please enter Patient ID."
+            )
 
         elif clinical_info == "":
-            st.error("Please enter clinical information.")
+
+            st.error(
+                "Please enter clinical information."
+            )
 
         else:
 
-            final_urgency = calculate_urgency(
+            urgency = calculate_urgency(
                 clinical_info,
                 clinical_status,
                 time_sensitive
             )
 
+            options = generate_options(
+                health_problem
+            )
+
             new_case = {
+
                 "Patient ID": patient_id,
+
                 "Age": age,
-                "Health Problem": health_problem,
-                "Clinical Information": clinical_info,
-                "Clinical Status": clinical_status,
-                "Time Sensitive": time_sensitive,
-                "Case Description": case_description,
-                "Decision Options": decision_options,
-                "Ethical Issue": ethical_issue,
-                "Urgency": final_urgency,
-                "Status": "Pending Review"
+
+                "Health Problem":
+                    health_problem,
+
+                "Clinical Information":
+                    clinical_info,
+
+                "Clinical Status":
+                    clinical_status,
+
+                "Time Sensitive":
+                    time_sensitive,
+
+                "Ethical Issue":
+                    ethical_issue,
+
+                "Urgency":
+                    urgency,
+
+                "Decision Options":
+                    options,
+
+                "Status":
+                    "Pending Review",
+
+                "Final Decision":
+                    "Not Recorded"
             }
 
             st.session_state.cases.append(
                 new_case
             )
 
+            add_audit(
+                "New case created for Patient "
+                + patient_id
+            )
+
             st.success(
                 "✅ Case created successfully!"
             )
 
-            if final_urgency == "CRITICAL":
+            st.write(
+                "**Detected Urgency:** "
+                + urgency
+            )
+
+            st.write(
+                "**Automatically Generated Options:**"
+            )
+
+            for option in options:
+
+                st.write(
+                    "• " + option
+                )
+
+            if urgency == "CRITICAL":
 
                 st.error(
-                    "🚨 CRITICAL CASE — Human clinical review required"
+                    "🚨 CRITICAL — Human clinical review required"
                 )
 
-            elif final_urgency == "URGENT":
+            elif urgency == "URGENT":
 
                 st.warning(
-                    "⚠️ URGENT CASE — Priority review required"
-                )
-
-            elif final_urgency == "MODERATE":
-
-                st.info(
-                    "🟡 MODERATE CASE — Review recommended"
+                    "⚠️ URGENT — Priority review required"
                 )
 
             else:
 
-                st.success(
-                    "🟢 ROUTINE CASE"
+                st.info(
+                    "Case successfully classified as "
+                    + urgency
                 )
 
 
-# ==================================================
+# =========================================================
 # CASES
-# ==================================================
+# =========================================================
 
 elif page == "Cases":
 
     st.title("📁 Cases")
 
-    st.write(
-        "View and manage clinical cases."
-    )
-
     search = st.text_input(
-        "🔍 Search by Patient ID"
+        "🔍 Search Patient ID"
     )
 
     urgency_filter = st.selectbox(
@@ -368,36 +568,41 @@ elif page == "Cases":
         ]
     )
 
-    filtered_cases = st.session_state.cases
+    filtered = st.session_state.cases
 
-    # Search
     if search:
 
-        filtered_cases = [
-            case
-            for case in filtered_cases
+        filtered = [
+
+            case for case in filtered
+
             if search.lower()
             in case["Patient ID"].lower()
+
         ]
 
-    # Urgency filter
     if urgency_filter != "All":
 
-        filtered_cases = [
-            case
-            for case in filtered_cases
-            if case["Urgency"] == urgency_filter
+        filtered = [
+
+            case for case in filtered
+
+            if case["Urgency"]
+            == urgency_filter
+
         ]
 
     st.divider()
 
-    if len(filtered_cases) == 0:
+    if len(filtered) == 0:
 
-        st.info("No cases found.")
+        st.info(
+            "No cases found."
+        )
 
     else:
 
-        for case in filtered_cases:
+        for case in filtered:
 
             with st.expander(
                 "Patient "
@@ -427,16 +632,6 @@ elif page == "Cases":
                 )
 
                 st.write(
-                    "**Clinical Status:**",
-                    case["Clinical Status"]
-                )
-
-                st.write(
-                    "**Time Sensitive:**",
-                    case["Time Sensitive"]
-                )
-
-                st.write(
                     "**Urgency:**",
                     case["Urgency"]
                 )
@@ -446,25 +641,24 @@ elif page == "Cases":
                     case["Status"]
                 )
 
-                if case["Ethical Issue"]:
+                st.write(
+                    "**Decision Options:**"
+                )
+
+                for option in case["Decision Options"]:
 
                     st.write(
-                        "**Ethical Issue:**",
-                        case["Ethical Issue"]
+                        "• " + option
                     )
 
 
-# ==================================================
+# =========================================================
 # PATIENT CARE URGENCY
-# ==================================================
+# =========================================================
 
 elif page == "Patient Care Urgency":
 
     st.title("🚨 Patient Care Urgency")
-
-    st.write(
-        "Prototype rule-based urgency assessment."
-    )
 
     clinical_info = st.text_area(
         "Clinical Signs / Symptoms"
@@ -496,18 +690,10 @@ elif page == "Patient Care Urgency":
             time_sensitive
         )
 
-        st.subheader(
-            "Urgency Result"
-        )
-
         if result == "CRITICAL":
 
             st.error(
                 "🚨 CRITICAL"
-            )
-
-            st.warning(
-                "Human clinical review required."
             )
 
         elif result == "URGENT":
@@ -534,314 +720,182 @@ elif page == "Patient Care Urgency":
     )
 
 
-# ==================================================
+# =========================================================
 # CLINICAL INFORMATION
-# ==================================================
+# =========================================================
 
 elif page == "Clinical Information":
 
     st.title("🩺 Clinical Information")
 
-    st.write("Clinical information management.")
-
-    st.checkbox("Medical History")
-
-    st.checkbox("Current Clinical Status")
-
-    st.checkbox("Relevant Findings")
-
-    st.checkbox("Investigations")
-
-    st.checkbox("Current Care Information")
-
-    st.checkbox("Available Decision Options")
-
-    st.info(
-        "Detailed clinical information module will be developed next."
+    st.write(
+        "Clinical information management."
     )
 
+    st.info(
+        "Clinical information is captured during case creation "
+        "and used by the decision-support modules."
+    )
 
-# ==================================================
+    st.write("• Medical history")
+
+    st.write("• Current clinical status")
+
+    st.write("• Relevant findings")
+
+    st.write("• Investigations")
+
+    st.write("• Current care information")
+
+    st.write("• Available decision options")
+
+
+# =========================================================
 # AI DECISION SUPPORT
-# ==================================================
+# =========================================================
 
 elif page == "AI Decision Support":
 
     st.title("🤖 AI Decision Support")
 
-    st.write(
-        "AI-assisted analysis of clinical cases and decision options."
-    )
-
-    # Check whether cases exist
     if len(st.session_state.cases) == 0:
 
         st.info(
-            "No cases available. Please create a case first."
+            "Create a case first."
         )
 
     else:
 
-        # Select case
-        patient_ids = []
+        patient_ids = [
 
-        for case in st.session_state.cases:
-            patient_ids.append(case["Patient ID"])
+            case["Patient ID"]
 
-        selected_patient = st.selectbox(
+            for case in st.session_state.cases
+
+        ]
+
+        selected = st.selectbox(
             "Select Patient Case",
             patient_ids
         )
 
-        # Find selected case
-        selected_case = None
+        case = None
 
-        for case in st.session_state.cases:
+        for item in st.session_state.cases:
 
-            if case["Patient ID"] == selected_patient:
-                selected_case = case
+            if item["Patient ID"] == selected:
+
+                case = item
 
         st.divider()
 
-        # ------------------------------------------
-        # CASE INFORMATION
-        # ------------------------------------------
-
-        st.subheader("📋 Case Information")
+        st.subheader("📋 Case Analysis")
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
+
             st.write(
-                "**Patient ID:**",
-                selected_case["Patient ID"]
+                "**Patient:**",
+                case["Patient ID"]
             )
 
         with col2:
+
             st.write(
-                "**Age:**",
-                selected_case["Age"]
+                "**Condition:**",
+                case["Health Problem"]
             )
 
         with col3:
+
             st.write(
                 "**Urgency:**",
-                selected_case["Urgency"]
+                case["Urgency"]
             )
-
-        st.write(
-            "**Health Problem:**",
-            selected_case["Health Problem"]
-        )
 
         st.write(
             "**Clinical Information:**",
-            selected_case["Clinical Information"]
+            case["Clinical Information"]
         )
 
-        # ------------------------------------------
-        # ETHICAL ISSUE
-        # ------------------------------------------
+        st.subheader(
+            "💡 Suggested Decision Options"
+        )
 
-        st.subheader("⚖️ Ethical Issue")
+        for option in case["Decision Options"]:
 
-        if selected_case["Ethical Issue"]:
-
-            st.warning(
-                selected_case["Ethical Issue"]
+            st.write(
+                "• " + option
             )
-
-        else:
-
-            st.info(
-                "No ethical issue has been recorded."
-            )
-
-        # ------------------------------------------
-        # DECISION OPTIONS
-        # ------------------------------------------
-
-        st.subheader("💡 Clinical Decision Options")
-
-        options_text = selected_case["Decision Options"]
-
-        if options_text:
-
-            options = options_text.split("\n")
-
-            for i, option in enumerate(options):
-
-                if option.strip():
-
-                    st.write(
-                        str(i + 1) + ". " + option
-                    )
-
-        else:
-
-            options = []
-
-            st.info(
-                "No decision options have been entered."
-            )
-
-        # ------------------------------------------
-        # AI ANALYSIS
-        # ------------------------------------------
 
         if st.button("🤖 Analyze Case"):
 
             st.divider()
 
-            st.subheader("🧠 AI Analysis")
+            if case["Urgency"] == "CRITICAL":
 
-            urgency = selected_case["Urgency"]
+                suggestion = case[
+                    "Decision Options"
+                ][0]
 
-            clinical_text = selected_case[
-                "Clinical Information"
-            ].lower()
-
-            # Basic prototype reasoning
-            if urgency == "CRITICAL":
-
-                recommendation = (
-                    "Prioritize immediate clinical review "
-                    "and the safest available intervention."
+                reason = (
+                    "The case is classified as CRITICAL. "
+                    "The prototype prioritizes patient safety "
+                    "and timely human clinical review."
                 )
 
-                reasoning = (
-                    "The case has been classified as CRITICAL. "
-                    "The system therefore prioritizes patient safety "
-                    "and immediate human clinical review."
+            elif case["Urgency"] == "URGENT":
+
+                suggestion = case[
+                    "Decision Options"
+                ][0]
+
+                reason = (
+                    "The case is classified as URGENT. "
+                    "Priority clinical review is recommended."
                 )
-
-                confidence = "High urgency signal"
-
-            elif urgency == "URGENT":
-
-                recommendation = (
-                    "Prioritize timely clinical intervention "
-                    "with human review."
-                )
-
-                reasoning = (
-                    "The case has been classified as URGENT. "
-                    "The system recommends priority review "
-                    "before a final decision is made."
-                )
-
-                confidence = "Moderate-high urgency signal"
-
-            elif urgency == "MODERATE":
-
-                recommendation = (
-                    "Review available options and obtain "
-                    "additional clinical information if required."
-                )
-
-                reasoning = (
-                    "The case has a MODERATE urgency level. "
-                    "Additional clinical review can help "
-                    "differentiate between available options."
-                )
-
-                confidence = "Moderate urgency signal"
 
             else:
 
-                recommendation = (
-                    "Proceed with routine clinical review "
-                    "and compare available options."
+                suggestion = case[
+                    "Decision Options"
+                ][1]
+
+                reason = (
+                    "The case does not currently meet the "
+                    "critical urgency threshold. Further "
+                    "assessment may help compare available options."
                 )
-
-                reasoning = (
-                    "The case has been classified as ROUTINE. "
-                    "The system recommends standard review "
-                    "of the available decision options."
-                )
-
-                confidence = "Routine urgency signal"
-
-            # --------------------------------------
-            # RESULTS
-            # --------------------------------------
 
             st.success(
-                "Suggested Decision Approach"
+                "🤖 Suggested Option: "
+                + suggestion
             )
 
-            st.write(
-                recommendation
+            st.subheader("🧠 Reasoning")
+
+            st.write(reason)
+
+            st.subheader(
+                "📊 Confidence / Uncertainty"
             )
-
-            st.subheader("Why?")
-
-            st.write(
-                reasoning
-            )
-
-            st.subheader("📊 Uncertainty / Confidence")
 
             st.info(
-                confidence
-            )
-
-            # --------------------------------------
-            # CLINICAL KEYWORD CHECK
-            # --------------------------------------
-
-            st.subheader(
-                "🔍 Clinical Information Analysis"
-            )
-
-            important_terms = [
-                "severe",
-                "critical",
-                "chest pain",
-                "breathing difficulty",
-                "shock",
-                "collapse",
-                "unconscious"
-            ]
-
-            detected = []
-
-            for term in important_terms:
-
-                if term in clinical_text:
-                    detected.append(term)
-
-            if len(detected) > 0:
-
-                st.warning(
-                    "Important clinical terms detected: "
-                    + ", ".join(detected)
-                )
-
-            else:
-
-                st.info(
-                    "No predefined high-risk keywords detected."
-                )
-
-            # --------------------------------------
-            # HUMAN REVIEW
-            # --------------------------------------
-
-            st.subheader(
-                "👨‍⚕️ Human Review"
+                "Prototype confidence based on available "
+                "case information. Additional clinical data "
+                "may change the recommendation."
             )
 
             st.warning(
                 "AI output is decision support only. "
-                "A qualified human decision-maker must "
-                "review and approve the final clinical decision."
+                "Final decisions require qualified human review."
             )
 
 
-# ==================================================
+# =========================================================
 # MCDM ANALYSIS
-# ==================================================
+# =========================================================
 
 elif page == "MCDM Analysis":
 
@@ -851,68 +905,213 @@ elif page == "MCDM Analysis":
         "Multi-Criteria Decision Making"
     )
 
-    st.info(
-        "MCDM calculation module will be developed next."
-    )
+    if len(st.session_state.cases) == 0:
 
-    st.write("Planned features:")
+        st.info(
+            "Create a case first."
+        )
 
-    st.write("• Criteria selection")
+    else:
 
-    st.write("• Criteria weighting")
+        patient_ids = [
 
-    st.write("• Option scoring")
+            case["Patient ID"]
 
-    st.write("• Weighted-score calculation")
+            for case in st.session_state.cases
 
-    st.write("• Option ranking")
+        ]
 
-    st.write("• Sensitivity analysis")
+        selected = st.selectbox(
+            "Select Case",
+            patient_ids
+        )
 
-    st.write("• Calculation transparency")
+        selected_case = None
+
+        for case in st.session_state.cases:
+
+            if case["Patient ID"] == selected:
+
+                selected_case = case
+
+        st.subheader(
+            "Automatically Selected Criteria"
+        )
+
+        weights, scores = calculate_scores(
+            selected_case["Urgency"],
+            selected_case["Decision Options"]
+        )
+
+        for criterion, weight in weights.items():
+
+            st.write(
+                criterion
+                + " — "
+                + str(weight)
+                + "%"
+            )
+
+        st.divider()
+
+        st.subheader(
+            "🏆 Decision Option Ranking"
+        )
+
+        ranking = sorted(
+            scores.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        for position, item in enumerate(
+            ranking,
+            start=1
+        ):
+
+            option = item[0]
+            score = item[1]
+
+            if position == 1:
+
+                st.success(
+                    "🥇 "
+                    + option
+                    + " — "
+                    + str(score)
+                    + "/100"
+                )
+
+            elif position == 2:
+
+                st.info(
+                    "🥈 "
+                    + option
+                    + " — "
+                    + str(score)
+                    + "/100"
+                )
+
+            else:
+
+                st.write(
+                    "🥉 "
+                    + option
+                    + " — "
+                    + str(score)
+                    + "/100"
+                )
+
+        st.divider()
+
+        st.subheader(
+            "🧮 Calculation Transparency"
+        )
+
+        st.write(
+            "Weighted Score = "
+            "(Safety × 40%) + "
+            "(Effectiveness × 30%) + "
+            "(Ethics × 15%) + "
+            "(Resources × 10%) + "
+            "(Patient Preference × 5%)"
+        )
+
+        st.caption(
+            "Prototype MCDM scoring for demonstration purposes."
+        )
 
 
-# ==================================================
+# =========================================================
 # TRADE-OFF ANALYSIS
-# ==================================================
+# =========================================================
 
 elif page == "Trade-off Analysis":
 
     st.title("⚖️ Trade-off Analysis")
 
     st.write(
-        "Compare benefits, risks and ethical considerations."
+        "Compare decision options across major factors."
     )
 
-    st.info(
-        "Trade-off analysis module will be developed next."
-    )
+    if len(st.session_state.cases) == 0:
 
-    st.write("Planned comparisons:")
+        st.info(
+            "Create a case first."
+        )
 
-    st.write("• Benefits")
+    else:
 
-    st.write("• Risks and limitations")
+        patient_ids = [
 
-    st.write("• Resources")
+            case["Patient ID"]
 
-    st.write("• Ethical trade-offs")
+            for case in st.session_state.cases
 
-    st.write("• Patient preferences")
+        ]
 
-    st.write("• Clinical priorities")
+        selected = st.selectbox(
+            "Select Case",
+            patient_ids
+        )
+
+        case = None
+
+        for item in st.session_state.cases:
+
+            if item["Patient ID"] == selected:
+
+                case = item
+
+        for option in case["Decision Options"]:
+
+            st.subheader(
+                option
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.write(
+                    "✅ Potential Benefit"
+                )
+
+                st.write(
+                    "May address the immediate clinical objective."
+                )
+
+            with col2:
+
+                st.write(
+                    "⚠️ Potential Limitation"
+                )
+
+                st.write(
+                    "Requires appropriate clinical assessment."
+                )
+
+            with col3:
+
+                st.write(
+                    "⚖️ Ethical Consideration"
+                )
+
+                st.write(
+                    "Patient safety and preferences should be considered."
+                )
 
 
-# ==================================================
+# =========================================================
 # STAKEHOLDER OPINIONS
-# ==================================================
+# =========================================================
 
 elif page == "Stakeholder Opinions":
 
     st.title("👥 Stakeholder Opinions")
 
     stakeholder = st.selectbox(
-        "Select Stakeholder",
+        "Stakeholder",
         [
             "Treating Doctor",
             "Appointed Doctor",
@@ -921,12 +1120,12 @@ elif page == "Stakeholder Opinions":
         ]
     )
 
-    opinion = st.text_area(
-        "Enter opinion"
-    )
-
     preferred_option = st.text_input(
         "Preferred Decision Option"
+    )
+
+    reasoning = st.text_area(
+        "Reasoning / Opinion"
     )
 
     if st.button("Submit Opinion"):
@@ -936,221 +1135,316 @@ elif page == "Stakeholder Opinions":
             + " opinion recorded."
         )
 
+        add_audit(
+            stakeholder
+            + " submitted an opinion."
+        )
 
-# ==================================================
+
+# =========================================================
 # CONSENSUS MANAGEMENT
-# ==================================================
+# =========================================================
 
 elif page == "Consensus Management":
 
     st.title("🤝 Consensus Management")
 
     st.write(
-        "Track stakeholder agreement and disagreement."
+        "Track stakeholder agreement."
     )
 
-    agreement = st.slider(
-        "Consensus Percentage",
+    doctor_agreement = st.slider(
+        "Treating Doctor Agreement",
         0,
         100,
-        78
+        80
     )
+
+    appointed_agreement = st.slider(
+        "Appointed Doctor Agreement",
+        0,
+        100,
+        75
+    )
+
+    patient_agreement = st.slider(
+        "Patient Agreement",
+        0,
+        100,
+        70
+    )
+
+    official_agreement = st.slider(
+        "Medical Official Agreement",
+        0,
+        100,
+        80
+    )
+
+    consensus = round(
+        (
+            doctor_agreement
+            + appointed_agreement
+            + patient_agreement
+            + official_agreement
+        ) / 4
+    )
+
+    st.divider()
 
     st.metric(
-        "Current Consensus",
-        str(agreement) + "%"
+        "Overall Consensus",
+        str(consensus) + "%"
     )
 
-    if agreement >= 75:
+    if consensus >= 75:
 
         st.success(
-            "Consensus level: Good"
+            "✅ Consensus achieved."
         )
 
-    elif agreement >= 50:
+    elif consensus >= 50:
 
         st.warning(
-            "Consensus level: Moderate"
+            "⚠️ Partial consensus — further discussion recommended."
         )
 
     else:
 
         st.error(
-            "Further review may be required."
+            "🚨 Significant disagreement detected."
         )
 
 
-# ==================================================
+# =========================================================
 # DECISION TRANSPARENCY
-# ==================================================
+# =========================================================
 
 elif page == "Decision Transparency":
 
     st.title("🔎 Decision Transparency")
 
     st.write(
-        "View the factors considered during decision-making."
+        "Factors considered during the decision process."
     )
 
-    st.write("• Evidence considered")
+    st.write("📌 Clinical information")
 
-    st.write("• Data sources")
+    st.write("📌 Urgency assessment")
 
-    st.write("• Ethical criteria")
+    st.write("📌 Ethical considerations")
 
-    st.write("• Criteria weights")
+    st.write("📌 Decision options")
 
-    st.write("• Option scores")
+    st.write("📌 MCDM criteria and weights")
 
-    st.write("• AI reasoning")
+    st.write("📌 Weighted option scores")
 
-    st.write("• Stakeholder contributions")
+    st.write("📌 AI reasoning")
 
-    st.write("• Trade-offs")
+    st.write("📌 Stakeholder opinions")
 
-    st.write("• Disagreements")
+    st.write("📌 Trade-offs")
 
-    st.write("• Human review status")
+    st.write("📌 Consensus")
+
+    st.write("📌 Human review")
 
 
-# ==================================================
+# =========================================================
 # FINAL HUMAN DECISION
-# ==================================================
+# =========================================================
 
 elif page == "Final Human Decision":
 
     st.title("👨‍⚕️ Final Human Decision")
 
-    st.write(
-        "Final decision must be reviewed and recorded by an authorized human decision-maker."
-    )
+    if len(st.session_state.cases) == 0:
 
-    decision = st.selectbox(
-        "Final Decision",
-        [
-            "Accept AI suggestion",
-            "Modify AI suggestion",
-            "Reject AI suggestion",
-            "Further Review Required"
+        st.info(
+            "Create a case first."
+        )
+
+    else:
+
+        patient_ids = [
+
+            case["Patient ID"]
+
+            for case in st.session_state.cases
+
         ]
-    )
 
-    justification = st.text_area(
-        "Decision Justification"
-    )
+        selected = st.selectbox(
+            "Select Case",
+            patient_ids
+        )
 
-    approved = st.checkbox(
-        "Human review completed"
-    )
+        decision = st.selectbox(
+            "Final Decision",
+            [
+                "Accept AI suggestion",
+                "Modify AI suggestion",
+                "Reject AI suggestion",
+                "Further Review Required"
+            ]
+        )
 
-    if st.button("Record Final Decision"):
+        justification = st.text_area(
+            "Decision Justification"
+        )
 
-        if approved:
+        human_review = st.checkbox(
+            "I confirm that human review has been completed."
+        )
 
-            st.success(
-                "✅ Final human decision recorded."
-            )
+        if st.button("Record Final Decision"):
 
-        else:
+            if human_review:
 
-            st.warning(
-                "Human review confirmation is required."
-            )
+                for case in st.session_state.cases:
+
+                    if case["Patient ID"] == selected:
+
+                        case["Final Decision"] = decision
+
+                        case["Status"] = "Decision Recorded"
+
+                add_audit(
+                    "Final human decision recorded for Patient "
+                    + selected
+                )
+
+                st.success(
+                    "✅ Final human decision recorded."
+                )
+
+            else:
+
+                st.warning(
+                    "Human review confirmation is required."
+                )
 
 
-# ==================================================
+# =========================================================
 # AUDIT TRAIL
-# ==================================================
+# =========================================================
 
 elif page == "Audit Trail":
 
     st.title("📜 Audit Trail")
 
-    st.write(
-        "Track case and decision history."
-    )
+    if len(st.session_state.audit) == 0:
 
-    st.write("• User activity tracking")
+        st.info(
+            "No audit activity yet."
+        )
 
-    st.write("• Decision history")
+    else:
 
-    st.write("• Data-change history")
+        for activity in st.session_state.audit:
 
-    st.write("• Timestamp tracking")
+            st.write(
+                "🕒 "
+                + activity["time"]
+                + " — "
+                + activity["message"]
+            )
 
-    st.write("• User-role tracking")
 
-    st.write("• AI analysis history")
-
-    st.write("• Final decision history")
-
-
-# ==================================================
+# =========================================================
 # NOTIFICATIONS
-# ==================================================
+# =========================================================
 
 elif page == "Notifications":
 
     st.title("🔔 Notifications")
 
-    urgent_count = 0
+    critical = 0
+    urgent = 0
 
     for case in st.session_state.cases:
 
-        if case["Urgency"] in ["CRITICAL", "URGENT"]:
+        if case["Urgency"] == "CRITICAL":
+            critical += 1
 
-            urgent_count += 1
+        elif case["Urgency"] == "URGENT":
+            urgent += 1
 
-    if urgent_count > 0:
+    if critical > 0:
 
-        st.warning(
-            str(urgent_count)
-            + " urgent/critical case(s) require review."
+        st.error(
+            "🚨 "
+            + str(critical)
+            + " critical case(s) require human review."
         )
 
-    else:
+    if urgent > 0:
+
+        st.warning(
+            "⚠️ "
+            + str(urgent)
+            + " urgent case(s) require priority review."
+        )
+
+    if critical == 0 and urgent == 0:
 
         st.success(
             "No urgent notifications."
         )
 
-    st.write("• Urgent-case alerts")
 
-    st.write("• Pending-review alerts")
-
-    st.write("• New opinion notifications")
-
-    st.write("• Disagreement alerts")
-
-    st.write("• Consensus notifications")
-
-    st.write("• Human-review notifications")
-
-
-# ==================================================
+# =========================================================
 # SETTINGS
-# ==================================================
+# =========================================================
 
 elif page == "Settings":
 
     st.title("⚙️ Settings")
 
-    st.write("System configuration")
+    st.write(
+        "System configuration"
+    )
 
-    st.write("• User Profile")
+    st.checkbox(
+        "Enable urgent-case notifications",
+        value=True
+    )
 
-    st.write("• Role Management")
+    st.checkbox(
+        "Require human review before final decision",
+        value=True
+    )
 
-    st.write("• Notification Settings")
+    st.checkbox(
+        "Enable audit logging",
+        value=True
+    )
 
-    st.write("• Decision Criteria")
+    st.subheader(
+        "Decision Criteria"
+    )
 
-    st.write("• MCDM Weight Configuration")
+    st.write(
+        "Patient Safety — 40%"
+    )
 
-    st.write("• Access Permissions")
+    st.write(
+        "Clinical Effectiveness — 30%"
+    )
 
-    st.write("• Security Settings")
+    st.write(
+        "Ethical Acceptability — 15%"
+    )
 
-    st.info(
-        "Security and authentication features will be implemented in the next development stage."
+    st.write(
+        "Resource Availability — 10%"
+    )
+
+    st.write(
+        "Patient Preference — 5%"
+    )
+
+    st.success(
+        "Settings loaded."
     )

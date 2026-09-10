@@ -5,6 +5,8 @@ st.set_page_config(
     page_icon="⚖️",
     layout="wide"
 )
+if "cases" not in st.session_state:
+    st.session_state.cases = []
 
 # ---------------- SIDEBAR ----------------
 
@@ -126,16 +128,28 @@ elif page == "➕ New Case":
         ]
     )
 
-    if st.button("Create Case"):
+   if st.button("Create Case"):
 
-        if patient_name == "":
-            st.warning("Please enter a Patient ID / Name.")
+    if patient_name == "":
+        st.warning("Please enter a Patient ID / Name.")
 
-        else:
-            st.success("Case created successfully!")
+    else:
 
-            st.write("### Case Summary")
-            st.write("Patient:", patient_name)
-            st.write("Age:", age)
-            st.write("Health Problem:", health_problem)
-            st.write("Urgency:", urgency)
+        new_case = {
+            "patient": patient_name,
+            "age": age,
+            "health_problem": health_problem,
+            "clinical_info": clinical_info,
+            "urgency": urgency
+        }
+
+        st.session_state.cases.append(new_case)
+
+        st.success("Case created successfully! ✅")
+
+        st.write("### Case Summary")
+
+        st.write("Patient:", patient_name)
+        st.write("Age:", age)
+        st.write("Health Problem:", health_problem)
+        st.write("Urgency:", urgency)

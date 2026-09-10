@@ -1,9 +1,29 @@
 import streamlit as st
+import json
+import csv
+import re
+import io
 from datetime import datetime
-import html
+
+# Optional file readers
+try:
+    from PyPDF2 import PdfReader
+except:
+    PdfReader = None
+
+try:
+    from docx import Document
+except:
+    Document = None
+
+try:
+    from openpyxl import load_workbook
+except:
+    load_workbook = None
+
 
 # ============================================================
-# ETHICSYNC - CLINICAL DECISION SUPPORT PROTOTYPE
+# PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
@@ -13,138 +33,315 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
+# ============================================================
+# DARK + LIGHT MODE SAFE CSS
+# ============================================================
+
+st.markdown("""
+<style>
+
+    /* Main application */
+    .stApp {
+        background-color: #f7f9fc;
+        color: #172033;
+    }
+
+    /* Main content */
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+        max-width: 1400px;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #111827;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #f9fafb !important;
+    }
+
+    section[data-testid="stSidebar"] .stRadio label {
+        color: #f9fafb !important;
+    }
+
+    section[data-testid="stSidebar"] .stMarkdown {
+        color: #f9fafb !important;
+    }
+
+    /* Headers */
+    h1, h2, h3, h4 {
+        color: #172033 !important;
+    }
+
+    /* Paragraphs */
+    p, label, span, div {
+        color: #172033;
+    }
+
+    /* Input boxes */
+    .stTextInput input,
+    .stNumberInput input,
+    .stTextArea textarea,
+    .stSelectbox div[data-baseweb="select"],
+    .stMultiSelect div[data-baseweb="select"] {
+        background-color: #ffffff !important;
+        color: #172033 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* Selectbox text */
+    .stSelectbox span,
+    .stMultiSelect span {
+        color: #172033 !important;
+    }
+
+    /* File uploader */
+    section[data-testid="stFileUploader"] {
+        background-color: #ffffff;
+        border: 2px dashed #64748b;
+        border-radius: 12px;
+        padding: 10px;
+    }
+
+    section[data-testid="stFileUploader"] * {
+        color: #172033 !important;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background-color: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        font-weight: 600 !important;
+    }
+
+    .stButton > button:hover {
+        background-color: #1d4ed8 !important;
+        color: white !important;
+    }
+
+    /* Metric cards */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border: 1px solid #dbe3ee;
+        border-radius: 12px;
+        padding: 15px;
+    }
+
+    div[data-testid="stMetric"] label {
+        color: #64748b !important;
+    }
+
+    div[data-testid="stMetric"] div {
+        color: #172033 !important;
+    }
+
+    /* Tables */
+    .stDataFrame {
+        background-color: #ffffff;
+    }
+
+    /* Custom cards */
+    .card {
+        background-color: #ffffff;
+        border: 1px solid #dbe3ee;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    }
+
+    .card-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #172033 !important;
+        margin-bottom: 8px;
+    }
+
+    .card-text {
+        color: #475569 !important;
+        font-size: 15px;
+    }
+
+    .section-title {
+        font-size: 26px;
+        font-weight: 800;
+        color: #172033 !important;
+        margin-bottom: 15px;
+    }
+
+    /* Status badges */
+    .badge-high {
+        background-color: #fee2e2;
+        color: #991b1b !important;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+    }
+
+    .badge-medium {
+        background-color: #fef3c7;
+        color: #92400e !important;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+    }
+
+    .badge-low {
+        background-color: #dcfce7;
+        color: #166534 !important;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+    }
+
+    /* Alert boxes */
+    .info-box {
+        background-color: #eff6ff;
+        border-left: 5px solid #2563eb;
+        padding: 15px;
+        border-radius: 8px;
+        color: #172033 !important;
+    }
+
+    .warning-box {
+        background-color: #fffbeb;
+        border-left: 5px solid #f59e0b;
+        padding: 15px;
+        border-radius: 8px;
+        color: #172033 !important;
+    }
+
+    .danger-box {
+        background-color: #fef2f2;
+        border-left: 5px solid #dc2626;
+        padding: 15px;
+        border-radius: 8px;
+        color: #172033 !important;
+    }
+
+    .success-box {
+        background-color: #f0fdf4;
+        border-left: 5px solid #16a34a;
+        padding: 15px;
+        border-radius: 8px;
+        color: #172033 !important;
+    }
+
+    /* Dark mode compatibility */
+    @media (prefers-color-scheme: dark) {
+
+        .stApp {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+        }
+
+        h1, h2, h3, h4,
+        p, label, span {
+            color: #f8fafc !important;
+        }
+
+        .card,
+        div[data-testid="stMetric"],
+        section[data-testid="stFileUploader"] {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        .card-title {
+            color: #f8fafc !important;
+        }
+
+        .card-text {
+            color: #cbd5e1 !important;
+        }
+
+        .stTextInput input,
+        .stNumberInput input,
+        .stTextArea textarea,
+        .stSelectbox div[data-baseweb="select"],
+        .stMultiSelect div[data-baseweb="select"] {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: #475569 !important;
+        }
+
+        .stSelectbox span,
+        .stMultiSelect span {
+            color: #f8fafc !important;
+        }
+
+        section[data-testid="stFileUploader"] * {
+            color: #f8fafc !important;
+        }
+
+        div[data-testid="stMetric"] label {
+            color: #cbd5e1 !important;
+        }
+
+        div[data-testid="stMetric"] div {
+            color: #f8fafc !important;
+        }
+
+        .info-box {
+            background-color: #172554;
+            color: #dbeafe !important;
+        }
+
+        .warning-box {
+            background-color: #451a03;
+            color: #fef3c7 !important;
+        }
+
+        .danger-box {
+            background-color: #450a0a;
+            color: #fecaca !important;
+        }
+
+        .success-box {
+            background-color: #052e16;
+            color: #bbf7d0 !important;
+        }
+    }
+
+</style>
+""", unsafe_allow_html=True)
+
+
 # ============================================================
 # HEALTH PROBLEMS
 # ============================================================
 
 HEALTH_PROBLEMS = [
     "Cardiovascular Diseases & Hypertension",
-    "Diabetes & Metabolic Disorders",
-    "Obesity & Overweight",
-    "Respiratory Diseases",
+    "Diabetes",
+    "Cancer",
     "Neurological Disorders",
-    "Mental Health Disorders",
-    "Sleep Disorders",
-    "Cancer / Oncology",
-    "Infectious Diseases & Sepsis",
-    "Antimicrobial Resistance (AMR)",
-    "Trauma & Severe Injuries",
-    "Organ Failure & Critical Conditions",
-    "Severe Burns",
-    "Post-operative / Surgical Complications",
-    "Digestive & Gastrointestinal Disorders",
-    "Nutritional & Vitamin/Mineral Deficiencies",
-    "Eye & Vision Disorders",
+    "Respiratory Diseases",
+    "Kidney Disease",
+    "Liver Disease",
+    "Infectious Diseases",
+    "Stroke",
+    "Trauma",
+    "Pediatric Conditions",
+    "Geriatric Conditions",
+    "Mental Health",
+    "Pregnancy & Maternal Health",
+    "Rare Diseases",
+    "Autoimmune Disorders",
+    "Gastrointestinal Disorders",
+    "Endocrine Disorders",
+    "Blood Disorders",
     "Musculoskeletal Disorders",
-    "Allergies & Autoimmune Disorders",
-    "Maternal & Obstetric Emergencies",
-    "Pediatric / Neonatal Conditions",
-    "Pollution & Environmental-Related Illnesses",
-    "Other / Unclassified Clinical Condition"
+    "Ophthalmic Disorders",
+    "Dermatological Disorders",
+    "Other"
 ]
-
-# ============================================================
-# CUSTOM CSS
-# ============================================================
-
-st.markdown("""
-<style>
-
-.main {
-    background-color: #f5f9fc;
-}
-
-.block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 2rem;
-}
-
-h1, h2, h3 {
-    color: #123b5d;
-}
-
-[data-testid="stSidebar"] {
-    background-color: #092f50;
-}
-
-[data-testid="stSidebar"] * {
-    color: white;
-}
-
-.card {
-    background: white;
-    padding: 20px;
-    border-radius: 14px;
-    border: 1px solid #dbe7ef;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    margin-bottom: 15px;
-}
-
-.metric-card {
-    background: white;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid #dbe7ef;
-    text-align: center;
-}
-
-.option-card {
-    background: white;
-    padding: 18px;
-    border-radius: 14px;
-    border-left: 6px solid #1687c7;
-    margin-bottom: 12px;
-}
-
-.warning-card {
-    background: #fff8e6;
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid #f1d58a;
-}
-
-.danger-card {
-    background: #fff0f0;
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid #e8a3a3;
-}
-
-.success-card {
-    background: #edf9f2;
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid #9bd4af;
-}
-
-.info-card {
-    background: #edf7ff;
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid #a8d5f0;
-}
-
-.small-text {
-    color: #687987;
-    font-size: 14px;
-}
-
-.big-score {
-    font-size: 32px;
-    font-weight: bold;
-    color: #123b5d;
-}
-
-.stakeholder {
-    background: white;
-    border: 1px solid #dbe7ef;
-    padding: 16px;
-    border-radius: 12px;
-    margin-bottom: 10px;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -152,7 +349,7 @@ h1, h2, h3 {
 # ============================================================
 
 if "cases" not in st.session_state:
-    st.session_state.cases = []
+    st.session_state.cases = {}
 
 if "audit" not in st.session_state:
     st.session_state.audit = []
@@ -163,138 +360,523 @@ if "notifications" not in st.session_state:
 if "case_counter" not in st.session_state:
     st.session_state.case_counter = 1
 
+if "selected_case" not in st.session_state:
+    st.session_state.selected_case = None
+
 
 # ============================================================
-# HELPER FUNCTIONS
+# BASIC FUNCTIONS
 # ============================================================
 
 def now():
-    return datetime.now().strftime("%d-%m-%Y %H:%M")
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def add_audit(case_id, user, action, details):
-    st.session_state.audit.insert(0, {
-        "time": now(),
+def add_audit(case_id, action, actor="System"):
+    st.session_state.audit.append({
+        "timestamp": now(),
         "case_id": case_id,
-        "user": user,
-        "action": action,
-        "details": details
+        "actor": actor,
+        "action": action
     })
 
 
 def add_notification(message, level="Info"):
-    st.session_state.notifications.insert(0, {
+    st.session_state.notifications.append({
         "time": now(),
-        "message": message,
-        "level": level
+        "level": level,
+        "message": message
     })
 
 
-def calculate_urgency(urgency_input, time_sensitive, critical):
-    if critical:
-        return "Critical"
+# ============================================================
+# FILE EXTRACTION
+# ============================================================
 
-    if urgency_input == "High" or time_sensitive == "Within 24 hours":
+def extract_text_from_file(uploaded_file):
+
+    filename = uploaded_file.name.lower()
+    file_bytes = uploaded_file.getvalue()
+
+    # TXT
+    if filename.endswith(".txt"):
+        return file_bytes.decode("utf-8", errors="ignore")
+
+    # JSON
+    if filename.endswith(".json"):
+        try:
+            data = json.loads(file_bytes.decode("utf-8"))
+            return json.dumps(data, indent=2)
+        except:
+            return file_bytes.decode("utf-8", errors="ignore")
+
+    # CSV
+    if filename.endswith(".csv"):
+        try:
+            text = file_bytes.decode("utf-8", errors="ignore")
+            rows = list(csv.DictReader(io.StringIO(text)))
+
+            if rows:
+                return json.dumps(rows, indent=2)
+
+            return text
+        except:
+            return file_bytes.decode("utf-8", errors="ignore")
+
+    # PDF
+    if filename.endswith(".pdf"):
+
+        if PdfReader is None:
+            return "PDF reader is not installed."
+
+        try:
+            pdf = PdfReader(io.BytesIO(file_bytes))
+            pages = []
+
+            for page in pdf.pages:
+                pages.append(page.extract_text() or "")
+
+            return "\n".join(pages)
+
+        except Exception as e:
+            return f"Unable to read PDF: {e}"
+
+    # DOCX
+    if filename.endswith(".docx"):
+
+        if Document is None:
+            return "DOCX reader is not installed."
+
+        try:
+            document = Document(io.BytesIO(file_bytes))
+
+            paragraphs = [
+                p.text
+                for p in document.paragraphs
+                if p.text.strip()
+            ]
+
+            return "\n".join(paragraphs)
+
+        except Exception as e:
+            return f"Unable to read DOCX: {e}"
+
+    # XLSX
+    if filename.endswith(".xlsx"):
+
+        if load_workbook is None:
+            return "Excel reader is not installed."
+
+        try:
+            workbook = load_workbook(
+                io.BytesIO(file_bytes),
+                data_only=True
+            )
+
+            output = []
+
+            for sheet in workbook.sheetnames:
+
+                ws = workbook[sheet]
+
+                output.append(f"Sheet: {sheet}")
+
+                for row in ws.iter_rows(values_only=True):
+
+                    values = [
+                        str(cell)
+                        for cell in row
+                        if cell is not None
+                    ]
+
+                    if values:
+                        output.append(" | ".join(values))
+
+            return "\n".join(output)
+
+        except Exception as e:
+            return f"Unable to read Excel file: {e}"
+
+    return "Unsupported file type."
+
+
+# ============================================================
+# TEXT HELPERS
+# ============================================================
+
+def find_value(text, patterns):
+
+    for pattern in patterns:
+
+        match = re.search(
+            pattern,
+            text,
+            re.IGNORECASE
+        )
+
+        if match:
+            return match.group(1).strip()
+
+    return ""
+
+
+def extract_patient_data(text):
+
+    data = {}
+
+    # Patient ID
+    data["patient_id"] = find_value(
+        text,
+        [
+            r"patient\s*id\s*[:\-]\s*([A-Za-z0-9\-_]+)",
+            r"patientid\s*[:\-]\s*([A-Za-z0-9\-_]+)",
+            r"ID\s*[:\-]\s*([A-Za-z0-9\-_]+)"
+        ]
+    )
+
+    # Name
+    data["name"] = find_value(
+        text,
+        [
+            r"patient\s*name\s*[:\-]\s*(.+)",
+            r"name\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Age
+    age = find_value(
+        text,
+        [
+            r"age\s*[:\-]\s*(\d+)",
+            r"(\d+)\s*years?\s*old"
+        ]
+    )
+
+    try:
+        data["age"] = int(age)
+    except:
+        data["age"] = 0
+
+    # Gender
+    data["gender"] = find_value(
+        text,
+        [
+            r"gender\s*[:\-]\s*(\w+)",
+            r"sex\s*[:\-]\s*(\w+)"
+        ]
+    )
+
+    # Blood pressure
+    data["blood_pressure"] = find_value(
+        text,
+        [
+            r"blood\s*pressure\s*[:\-]\s*([0-9]{2,3}\s*/\s*[0-9]{2,3})",
+            r"BP\s*[:\-]\s*([0-9]{2,3}\s*/\s*[0-9]{2,3})"
+        ]
+    )
+
+    # Heart rate
+    hr = find_value(
+        text,
+        [
+            r"heart\s*rate\s*[:\-]\s*(\d+)",
+            r"HR\s*[:\-]\s*(\d+)"
+        ]
+    )
+
+    try:
+        data["heart_rate"] = int(hr)
+    except:
+        data["heart_rate"] = 0
+
+    # Temperature
+    temp = find_value(
+        text,
+        [
+            r"temperature\s*[:\-]\s*([0-9.]+)",
+            r"temp\s*[:\-]\s*([0-9.]+)"
+        ]
+    )
+
+    try:
+        data["temperature"] = float(temp)
+    except:
+        data["temperature"] = 0.0
+
+    # SpO2
+    spo2 = find_value(
+        text,
+        [
+            r"SpO2\s*[:\-]\s*([0-9.]+)",
+            r"oxygen\s*saturation\s*[:\-]\s*([0-9.]+)"
+        ]
+    )
+
+    try:
+        data["spo2"] = float(spo2)
+    except:
+        data["spo2"] = 0.0
+
+    # Health problem
+    problem = ""
+
+    for item in HEALTH_PROBLEMS:
+
+        if item.lower() in text.lower():
+
+            problem = item
+            break
+
+    if not problem:
+
+        if "hypertension" in text.lower():
+            problem = "Cardiovascular Diseases & Hypertension"
+
+        elif "diabetes" in text.lower():
+            problem = "Diabetes"
+
+        elif "cancer" in text.lower():
+            problem = "Cancer"
+
+        elif "stroke" in text.lower():
+            problem = "Stroke"
+
+        elif "kidney" in text.lower():
+            problem = "Kidney Disease"
+
+        elif "respiratory" in text.lower():
+            problem = "Respiratory Diseases"
+
+        else:
+            problem = "Other"
+
+    data["health_problem"] = problem
+
+    # History
+    data["history"] = find_value(
+        text,
+        [
+            r"medical\s*history\s*[:\-]\s*(.+)",
+            r"history\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Symptoms
+    data["symptoms"] = find_value(
+        text,
+        [
+            r"symptoms?\s*[:\-]\s*(.+)",
+            r"presenting\s*symptoms?\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Investigations
+    data["investigations"] = find_value(
+        text,
+        [
+            r"investigations?\s*[:\-]\s*(.+)",
+            r"tests?\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Current care
+    data["current_care"] = find_value(
+        text,
+        [
+            r"current\s*care\s*[:\-]\s*(.+)",
+            r"treatment\s*[:\-]\s*(.+)",
+            r"management\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Ethical issue
+    data["ethical_issue"] = find_value(
+        text,
+        [
+            r"ethical\s*issue\s*[:\-]\s*(.+)",
+            r"ethics\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Time sensitivity
+    data["time_sensitivity"] = find_value(
+        text,
+        [
+            r"time\s*sensitivity\s*[:\-]\s*(.+)",
+            r"urgency\s*[:\-]\s*(.+)"
+        ]
+    )
+
+    # Full source text
+    data["source_text"] = text
+
+    return data
+
+
+# ============================================================
+# URGENCY ANALYSIS
+# ============================================================
+
+def calculate_urgency(patient):
+
+    score = 0
+
+    symptoms = str(patient.get("symptoms", "")).lower()
+    bp = str(patient.get("blood_pressure", "")).lower()
+
+    try:
+        spo2 = float(patient.get("spo2", 0))
+    except:
+        spo2 = 0
+
+    try:
+        hr = int(patient.get("heart_rate", 0))
+    except:
+        hr = 0
+
+    if spo2 > 0 and spo2 < 92:
+        score += 3
+
+    elif spo2 > 0 and spo2 < 95:
+        score += 2
+
+    if hr >= 120 or (hr > 0 and hr < 50):
+        score += 2
+
+    if "chest pain" in symptoms:
+        score += 2
+
+    if "shortness of breath" in symptoms:
+        score += 2
+
+    if "severe" in symptoms:
+        score += 2
+
+    if "/" in bp:
+
+        try:
+            systolic = int(bp.split("/")[0])
+
+            if systolic >= 180:
+                score += 3
+
+            elif systolic >= 160:
+                score += 2
+
+        except:
+            pass
+
+    if score >= 6:
         return "High"
 
-    if urgency_input == "Medium" or time_sensitive == "Within 72 hours":
+    elif score >= 3:
         return "Medium"
 
     return "Low"
 
 
-def urgency_color(level):
-    if level == "Critical":
-        return "🔴"
-    if level == "High":
-        return "🟠"
-    if level == "Medium":
-        return "🟡"
-    return "🟢"
+# ============================================================
+# DECISION OPTIONS
+# ============================================================
 
+def generate_options(patient):
 
-def generate_options(problem):
-    """
-    Short, generic decision alternatives.
-    This is a prototype and does NOT prescribe treatment.
-    """
+    urgency = patient.get("urgency", "Medium")
 
-    if problem in [
-        "Trauma & Severe Injuries",
-        "Organ Failure & Critical Conditions",
-        "Severe Burns",
-        "Maternal & Obstetric Emergencies",
-        "Pediatric / Neonatal Conditions",
-        "Infectious Diseases & Sepsis"
-    ]:
-        return [
-            {
-                "name": "A — Immediate Intervention",
-                "urgency": "High",
+    if urgency == "High":
+
+        return {
+            "A": {
+                "name": "Immediate Intervention",
                 "benefit": 9,
-                "risk": 7,
-                "resource": 8,
+                "risk": 6,
+                "resources": 8,
                 "ethics": 8,
-                "preference": 6,
-                "description": "Act immediately to address the time-sensitive clinical concern."
+                "patient": 6
             },
-            {
-                "name": "B — Further Investigation",
-                "urgency": "Moderate",
-                "benefit": 8,
-                "risk": 4,
-                "resource": 6,
-                "ethics": 9,
-                "preference": 7,
-                "description": "Collect additional information before selecting the next clinical action."
-            },
-            {
-                "name": "C — Conservative Management",
-                "urgency": "Low",
-                "benefit": 6,
+            "B": {
+                "name": "Further Investigation",
+                "benefit": 7,
                 "risk": 3,
-                "resource": 4,
-                "ethics": 8,
-                "preference": 6,
-                "description": "Continue supportive monitoring while avoiding immediate escalation."
+                "resources": 6,
+                "ethics": 9,
+                "patient": 7
+            },
+            "C": {
+                "name": "Conservative Management",
+                "benefit": 5,
+                "risk": 7,
+                "resources": 3,
+                "ethics": 6,
+                "patient": 5
             }
-        ]
-
-    return [
-        {
-            "name": "A — Immediate Intervention",
-            "urgency": "High",
-            "benefit": 8,
-            "risk": 7,
-            "resource": 8,
-            "ethics": 8,
-            "preference": 6,
-            "description": "Proceed with timely clinical intervention based on the available information."
-        },
-        {
-            "name": "B — Further Investigation",
-            "urgency": "Moderate",
-            "benefit": 8,
-            "risk": 4,
-            "resource": 6,
-            "ethics": 9,
-            "preference": 8,
-            "description": "Gather additional evidence before making the next clinical decision."
-        },
-        {
-            "name": "C — Conservative Management",
-            "urgency": "Low",
-            "benefit": 6,
-            "risk": 3,
-            "resource": 4,
-            "ethics": 8,
-            "preference": 7,
-            "description": "Use continued monitoring and supportive management where appropriate."
         }
-    ]
 
+    elif urgency == "Medium":
+
+        return {
+            "A": {
+                "name": "Immediate Intervention",
+                "benefit": 8,
+                "risk": 6,
+                "resources": 7,
+                "ethics": 8,
+                "patient": 6
+            },
+            "B": {
+                "name": "Further Investigation",
+                "benefit": 8,
+                "risk": 3,
+                "resources": 5,
+                "ethics": 9,
+                "patient": 7
+            },
+            "C": {
+                "name": "Conservative Management",
+                "benefit": 6,
+                "risk": 5,
+                "resources": 3,
+                "ethics": 7,
+                "patient": 6
+            }
+        }
+
+    else:
+
+        return {
+            "A": {
+                "name": "Immediate Intervention",
+                "benefit": 6,
+                "risk": 6,
+                "resources": 7,
+                "ethics": 7,
+                "patient": 5
+            },
+            "B": {
+                "name": "Further Investigation",
+                "benefit": 7,
+                "risk": 3,
+                "resources": 5,
+                "ethics": 9,
+                "patient": 7
+            },
+            "C": {
+                "name": "Conservative Management",
+                "benefit": 8,
+                "risk": 2,
+                "resources": 2,
+                "ethics": 8,
+                "patient": 8
+            }
+        }
+
+
+# ============================================================
+# MCDM
+# ============================================================
 
 def calculate_mcdm(options):
+
     weights = {
         "Expected Benefit": 0.30,
         "Safety": 0.25,
@@ -304,191 +886,123 @@ def calculate_mcdm(options):
         "Patient Preference": 0.05
     }
 
-    scores = {}
+    results = {}
 
-    for option in options:
-        # Transparent prototype scoring
-        safety_score = 10 - option["risk"]
+    for key, option in options.items():
 
-        scores[option["name"]] = {
-            "Expected Benefit": option["benefit"],
-            "Safety": safety_score,
-            "Recovery Probability": option["benefit"],
-            "Resource Availability": 10 - option["resource"],
-            "Ethical Acceptability": option["ethics"],
-            "Patient Preference": option["preference"]
-        }
+        safety = 10 - option["risk"]
 
-    totals = {}
+        recovery = option["benefit"]
 
-    for option_name, criteria in scores.items():
-        total = 0
+        utility = (
+            weights["Expected Benefit"] * option["benefit"] +
+            weights["Safety"] * safety +
+            weights["Recovery Probability"] * recovery +
+            weights["Resource Availability"] * option["resources"] +
+            weights["Ethical Acceptability"] * option["ethics"] +
+            weights["Patient Preference"] * option["patient"]
+        )
 
-        for criterion, value in criteria.items():
-            total += value * weights[criterion]
-
-        totals[option_name] = round(total / 10, 2)
+        results[key] = round(utility, 2)
 
     ranking = sorted(
-        totals.items(),
+        results.items(),
         key=lambda x: x[1],
         reverse=True
     )
 
-    return weights, scores, totals, ranking
-
-
-def stakeholder_summary(case):
-    opinions = case.get("stakeholders", {})
-
-    counts = {}
-
-    for data in opinions.values():
-        choice = data.get("choice")
-
-        if choice:
-            counts[choice] = counts.get(choice, 0) + 1
-
-    total = len(opinions)
-
-    if not counts or total == 0:
-        return 0, None, counts
-
-    most_common = max(counts, key=counts.get)
-    agreement = round((counts[most_common] / total) * 100)
-
-    return agreement, most_common, counts
-
-
-def get_selected_case(case_id):
-    for case in st.session_state.cases:
-        if case["case_id"] == case_id:
-            return case
-    return None
+    return weights, results, ranking
 
 
 # ============================================================
-# DEFAULT DEMO CASE P001
+# CREATE CASE FROM PATIENT DATA
 # ============================================================
 
-if len(st.session_state.cases) == 0:
+def create_case(patient):
 
-    demo_options = generate_options(
-        "Cardiovascular Diseases & Hypertension"
-    )
+    case_number = st.session_state.case_counter
 
-    demo_case = {
-        "case_id": "CASE-001",
-        "patient_id": "P001",
-        "age": 45,
-        "gender": "Male",
+    patient_id = patient.get("patient_id")
 
-        "problem": "Cardiovascular Diseases & Hypertension",
+    if not patient_id:
+        patient_id = f"P{case_number:03d}"
 
-        "medical_history": [
-            "Hypertension — 5 years",
-            "Type 2 Diabetes — 3 years",
-            "No known drug allergies",
-            "Family history of heart disease"
-        ],
+    case_id = f"CASE-{case_number:03d}"
 
-        "allergies": "No known drug allergies",
+    patient["patient_id"] = patient_id
 
-        "medications": "Current antihypertensive and diabetic medication",
+    urgency = calculate_urgency(patient)
 
-        "symptoms": "Chest pain, fatigue and shortness of breath",
+    patient["urgency"] = urgency
 
-        "vitals": {
-            "Blood Pressure": "150/95 mmHg",
-            "Heart Rate": "96 bpm",
-            "Temperature": "37.5 °C",
-            "SpO₂": "94%"
+    options = generate_options(patient)
+
+    weights, scores, ranking = calculate_mcdm(options)
+
+    patient["options"] = options
+    patient["mcdm_weights"] = weights
+    patient["mcdm_scores"] = scores
+    patient["ranking"] = ranking
+
+    patient["status"] = "Active"
+    patient["assigned_to"] = "Clinical Review Team"
+
+    patient["final_decision"] = ""
+    patient["decision_status"] = "Pending Human Review"
+
+    patient["stakeholders"] = {
+        "Treating Doctor": {
+            "option": "A",
+            "reason": "Prioritizes timely clinical management."
         },
-
-        "findings": [
-            "Chest pain",
-            "Fatigue",
-            "Shortness of breath"
-        ],
-
-        "investigations": [
-            "ECG — requires clinical interpretation",
-            "Blood pressure monitoring",
-            "Blood glucose assessment",
-            "Cardiac biomarker assessment"
-        ],
-
-        "current_care": "Currently under clinical observation and routine management.",
-
-        "response_to_care": "Symptoms require further clinical review.",
-
-        "time_sensitive": "Within 24 hours",
-
-        "initial_urgency": "High",
-
-        "critical_flag": False,
-
-        "urgency": "High",
-
-        "ethical_issue": "Balancing timely intervention with patient safety and resource considerations.",
-
-        "options": demo_options,
-
-        "stakeholders": {
-            "Treating Doctor": {
-                "choice": "A — Immediate Intervention",
-                "reason": "Concern about the patient's symptoms and need for timely clinical action.",
-                "risk": "Moderate"
-            },
-
-            "Independent Physician": {
-                "choice": "B — Further Investigation",
-                "reason": "Would prefer additional evidence before escalation.",
-                "risk": "Moderate"
-            },
-
-            "Ethics Committee": {
-                "choice": "B — Further Investigation",
-                "reason": "Supports proportional decision-making while considering safety and patient autonomy.",
-                "risk": "Low"
-            },
-
-            "Patient": {
-                "choice": "C — Conservative Management",
-                "reason": "Prefers to avoid immediate escalation unless clearly necessary.",
-                "risk": "Moderate"
-            }
+        "Independent Physician": {
+            "option": "B",
+            "reason": "Requests additional clinical evidence before intervention."
         },
-
-        "status": "Active",
-        "assigned_to": "Dr. Sharma",
-        "final_decision": "",
-        "decision_justification": "",
-        "human_reviewed": False,
-        "created": now()
+        "Ethics Committee": {
+            "option": "B",
+            "reason": "Balances safety, proportionality, and uncertainty."
+        },
+        "Patient": {
+            "option": "C",
+            "reason": "Prefers a less intensive approach where clinically acceptable."
+        }
     }
 
-    st.session_state.cases.append(demo_case)
+    patient["created_at"] = now()
+
+    st.session_state.cases[case_id] = patient
+
+    st.session_state.selected_case = case_id
+
+    st.session_state.case_counter += 1
 
     add_audit(
-        "CASE-001",
-        "System",
-        "Case Created",
-        "Demo case P001 created for prototype demonstration."
+        case_id,
+        "Patient file uploaded and case created."
     )
 
-    add_audit(
-        "CASE-001",
-        "System",
-        "Clinical Analysis",
-        "Clinical information loaded for decision-support analysis."
-    )
+    if urgency == "High":
 
-    add_audit(
-        "CASE-001",
-        "System",
-        "Urgency Assessment",
-        "Urgency classified as High based on time-sensitive clinical inputs."
+        add_notification(
+            f"{case_id}: High urgency case requires review.",
+            "Urgent"
+        )
+
+    return case_id
+
+
+# ============================================================
+# GET SELECTED CASE
+# ============================================================
+
+def get_selected_case():
+
+    if not st.session_state.selected_case:
+        return None
+
+    return st.session_state.cases.get(
+        st.session_state.selected_case
     )
 
 
@@ -497,1479 +1011,908 @@ if len(st.session_state.cases) == 0:
 # ============================================================
 
 st.sidebar.markdown(
-    "<h2 style='color:white;'>⚕️ EthicSync</h2>",
-    unsafe_allow_html=True
-)
+    """
+    <div style="
+        font-size:28px;
+        font-weight:800;
+        color:#ffffff !important;
+        margin-bottom:5px;">
+        ⚕️ EthicSync
+    </div>
 
-st.sidebar.markdown(
-    "<p style='color:#b8d4e8;'>Clinical Decision Support</p>",
+    <div style="
+        font-size:13px;
+        color:#cbd5e1 !important;
+        margin-bottom:20px;">
+        Clinical Decision-Support Prototype
+    </div>
+    """,
     unsafe_allow_html=True
 )
 
 pages = [
-    "🏠 Dashboard",
-    "➕ New Case",
-    "📁 Cases",
-    "🚨 Patient Care Urgency",
-    "🧬 Clinical Information",
-    "🤖 AI Decision Support",
-    "📊 MCDM Analysis",
-    "⚖️ Trade-off Analysis",
-    "👥 Stakeholder Opinions",
-    "🤝 Consensus Management",
-    "🔍 Decision Transparency",
-    "✅ Final Human Decision",
-    "📜 Audit Trail",
-    "🔔 Notifications",
-    "⚙️ Settings"
+    "Dashboard",
+    "New Case",
+    "Cases",
+    "Patient Care Urgency",
+    "Clinical Information",
+    "AI Decision Support",
+    "MCDM Analysis",
+    "Trade-off Analysis",
+    "Stakeholder Opinions",
+    "Consensus Management",
+    "Decision Transparency",
+    "Final Human Decision",
+    "Audit Trail",
+    "Notifications",
+    "Settings"
 ]
 
-page = st.sidebar.radio("Navigation", pages)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-    "**EthicSync Prototype**\n\n"
-    "AI-assisted clinical decision support with "
-    "human oversight."
+page = st.sidebar.radio(
+    "Navigation",
+    pages
 )
 
 
 # ============================================================
-# COMMON CASE SELECTOR
+# DASHBOARD
 # ============================================================
 
-case_ids = [case["case_id"] for case in st.session_state.cases]
+if page == "Dashboard":
 
-if "selected_case_id" not in st.session_state:
-    st.session_state.selected_case_id = case_ids[0]
+    st.markdown(
+        '<div class="section-title">Dashboard</div>',
+        unsafe_allow_html=True
+    )
 
-if st.session_state.selected_case_id not in case_ids:
-    st.session_state.selected_case_id = case_ids[0]
+    cases = list(st.session_state.cases.values())
 
-selected_case = get_selected_case(
-    st.session_state.selected_case_id
-)
+    total_cases = len(cases)
 
-
-# ============================================================
-# 1. DASHBOARD
-# ============================================================
-
-if page == "🏠 Dashboard":
-
-    st.title("Welcome, Dr. Priya 👋")
-    st.caption("Better decisions. Clearer reasoning. Human oversight.")
-
-    total_cases = len(st.session_state.cases)
     active = len([
-        c for c in st.session_state.cases
-        if c["status"] == "Active"
+        c for c in cases
+        if c.get("status") == "Active"
     ])
 
     urgent = len([
-        c for c in st.session_state.cases
-        if c["urgency"] in ["High", "Critical"]
+        c for c in cases
+        if c.get("urgency") == "High"
     ])
 
     pending = len([
-        c for c in st.session_state.cases
-        if not c["human_reviewed"]
+        c for c in cases
+        if c.get("decision_status") == "Pending Human Review"
     ])
-
-    agreements = []
-
-    for c in st.session_state.cases:
-        agreement, _, _ = stakeholder_summary(c)
-        agreements.append(agreement)
-
-    consensus_count = len([
-        a for a in agreements
-        if a >= 75
-    ])
-
-    st.subheader("Overall Case Overview")
 
     c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-            <h4>Active Cases</h4>
-            <h1>{active}</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    c1.metric("Total Cases", total_cases)
+    c2.metric("Active Cases", active)
+    c3.metric("Urgent Cases", urgent)
+    c4.metric("Pending Review", pending)
 
-    with c2:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-            <h4>Pending Reviews</h4>
-            <h1>{pending}</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    st.markdown("### Quick Actions")
 
-    with c3:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-            <h4>Urgent Cases</h4>
-            <h1>{urgent}</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c4:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-            <h4>Consensus Status</h4>
-            <h1>{consensus_count}</h1>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.subheader("Quick Access")
-
-    q1, q2, q3, q4 = st.columns(4)
+    q1, q2 = st.columns(2)
 
     with q1:
-        if st.button("➕ New Case", use_container_width=True):
-            st.info("Use 'New Case' from the sidebar.")
+        st.info(
+            "📁 Upload a patient file from the New Case page."
+        )
 
     with q2:
-        if st.button("📁 Cases", use_container_width=True):
-            st.info("Use 'Cases' from the sidebar.")
+        st.info(
+            "🧠 Review AI, MCDM and stakeholder analysis."
+        )
 
-    with q3:
-        if st.button("🚨 Patient Urgency", use_container_width=True):
-            st.info("Use 'Patient Care Urgency' from the sidebar.")
+    st.markdown("### Recent Cases")
 
-    with q4:
-        if st.button("🤖 AI Decision Support", use_container_width=True):
-            st.info("Use 'AI Decision Support' from the sidebar.")
+    if cases:
 
-    st.subheader("Recent Activity")
-
-    if st.session_state.audit:
-
-        for item in st.session_state.audit[:5]:
+        for case_id, case in list(
+            st.session_state.cases.items()
+        )[-5:]:
 
             st.markdown(
                 f"""
                 <div class="card">
-                <b>{item['action']}</b><br>
-                <span class="small-text">
-                {item['case_id']} · {item['time']} · {item['user']}
-                </span><br>
-                {item['details']}
+                    <div class="card-title">
+                        {case_id} — {case.get("patient_id", "Unknown")}
+                    </div>
+
+                    <div class="card-text">
+                        Health Problem:
+                        {case.get("health_problem", "Not specified")}
+                        <br>
+                        Urgency:
+                        {case.get("urgency", "Not assessed")}
+                        <br>
+                        Status:
+                        {case.get("status", "Unknown")}
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
+    else:
+        st.info("No cases available. Upload a patient file to create a case.")
+
 
 # ============================================================
-# 2. NEW CASE
+# NEW CASE
 # ============================================================
 
-elif page == "➕ New Case":
-
-    st.title("Create New Case")
+elif page == "New Case":
 
     st.markdown(
-        '<div class="info-card">'
-        'Enter the available clinical information. '
-        'The system will automatically generate the decision-support workflow.'
-        '</div>',
+        '<div class="section-title">New Case</div>',
         unsafe_allow_html=True
     )
 
-    st.subheader("Patient Information")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        patient_id = st.text_input(
-            "Patient ID",
-            value="P002"
-        )
-
-    with col2:
-        age = st.number_input(
-            "Age",
-            min_value=0,
-            max_value=120,
-            value=40
-        )
-
-    with col3:
-        gender = st.selectbox(
-            "Gender",
-            ["Male", "Female", "Other / Not specified"]
-        )
-
-    problem = st.selectbox(
-        "Health Problem",
-        HEALTH_PROBLEMS
+    st.markdown(
+        """
+        <div class="info-box">
+        Upload the patient's clinical file. EthicSync will extract
+        available patient information and automatically prepare the
+        clinical decision-support workflow.
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.subheader("Clinical Information")
-
-    history = st.text_area(
-        "Medical History",
-        placeholder="Previous diseases, family history, allergies..."
+    uploaded_file = st.file_uploader(
+        "Upload Patient File",
+        type=[
+            "txt",
+            "csv",
+            "json",
+            "pdf",
+            "docx",
+            "xlsx"
+        ]
     )
 
-    symptoms = st.text_area(
-        "Current Symptoms / Clinical Status",
-        placeholder="Describe current symptoms and important findings..."
-    )
-
-    investigations = st.text_area(
-        "Investigations",
-        placeholder="ECG, laboratory findings, imaging, etc."
-    )
-
-    current_care = st.text_area(
-        "Current Care",
-        placeholder="Current management / observation / treatment status..."
-    )
-
-    response = st.text_area(
-        "Response to Current Care",
-        placeholder="Improving, stable, worsening, etc."
-    )
-
-    st.subheader("Urgency")
-
-    u1, u2, u3 = st.columns(3)
-
-    with u1:
-        initial_urgency = st.selectbox(
-            "Clinical urgency",
-            ["Low", "Medium", "High"]
-        )
-
-    with u2:
-        time_sensitive = st.selectbox(
-            "Time sensitivity",
-            [
-                "Routine",
-                "Within 72 hours",
-                "Within 24 hours"
-            ]
-        )
-
-    with u3:
-        critical = st.checkbox(
-            "Critical-care flag"
-        )
-
-    ethical_issue = st.text_area(
-        "Ethical Issue",
-        placeholder="Example: patient preference vs urgency..."
-    )
-
-    if st.button(
-        "Create Case & Generate Options",
-        type="primary",
-        use_container_width=True
-    ):
-
-        new_number = len(st.session_state.cases) + 1
-
-        case_id = f"CASE-{new_number:03d}"
-
-        urgency = calculate_urgency(
-            initial_urgency,
-            time_sensitive,
-            critical
-        )
-
-        option_data = generate_options(problem)
-
-        new_case = {
-            "case_id": case_id,
-            "patient_id": patient_id,
-            "age": age,
-            "gender": gender,
-            "problem": problem,
-
-            "medical_history": [
-                history if history else "No history entered."
-            ],
-
-            "allergies": "Not specified",
-            "medications": "Not specified",
-            "symptoms": symptoms,
-            "vitals": {},
-            "findings": [],
-
-            "investigations": [
-                investigations if investigations
-                else "No investigations entered."
-            ],
-
-            "current_care": current_care,
-            "response_to_care": response,
-
-            "time_sensitive": time_sensitive,
-            "initial_urgency": initial_urgency,
-            "critical_flag": critical,
-            "urgency": urgency,
-
-            "ethical_issue": ethical_issue,
-
-            "options": option_data,
-
-            "stakeholders": {
-                "Treating Doctor": {
-                    "choice": "",
-                    "reason": "",
-                    "risk": "Not assessed"
-                },
-                "Independent Physician": {
-                    "choice": "",
-                    "reason": "",
-                    "risk": "Not assessed"
-                },
-                "Ethics Committee": {
-                    "choice": "",
-                    "reason": "",
-                    "risk": "Not assessed"
-                },
-                "Patient": {
-                    "choice": "",
-                    "reason": "",
-                    "risk": "Not assessed"
-                }
-            },
-
-            "status": "Active",
-            "assigned_to": "Dr. Sharma",
-            "final_decision": "",
-            "decision_justification": "",
-            "human_reviewed": False,
-            "created": now()
-        }
-
-        st.session_state.cases.append(new_case)
-
-        st.session_state.selected_case_id = case_id
-
-        add_audit(
-            case_id,
-            "System",
-            "Case Created",
-            f"New case created for patient {patient_id}."
-        )
-
-        add_audit(
-            case_id,
-            "System",
-            "Options Generated",
-            "Three concise decision alternatives generated."
-        )
-
-        if urgency in ["High", "Critical"]:
-
-            add_notification(
-                f"Urgent case {case_id} requires clinical review.",
-                "Urgent"
-            )
+    if uploaded_file:
 
         st.success(
-            f"Case {case_id} created successfully."
+            f"Uploaded: {uploaded_file.name}"
         )
 
-        st.info(
-            "Three decision options have been automatically generated."
+        if st.button("Extract Patient Information"):
+
+            text = extract_text_from_file(
+                uploaded_file
+            )
+
+            patient = extract_patient_data(text)
+
+            st.session_state.uploaded_patient = patient
+
+            st.success(
+                "Patient information extracted successfully."
+            )
+
+    if "uploaded_patient" in st.session_state:
+
+        patient = st.session_state.uploaded_patient
+
+        st.markdown("### Extracted Patient Information")
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.text_input(
+                "Patient ID",
+                value=patient.get("patient_id", ""),
+                key="edit_patient_id"
+            )
+
+            st.number_input(
+                "Age",
+                min_value=0,
+                max_value=120,
+                value=patient.get("age", 0),
+                key="edit_age"
+            )
+
+        with c2:
+
+            st.text_input(
+                "Patient Name",
+                value=patient.get("name", ""),
+                key="edit_name"
+            )
+
+            st.text_input(
+                "Gender",
+                value=patient.get("gender", ""),
+                key="edit_gender"
+            )
+
+        with c3:
+
+            st.selectbox(
+                "Health Problem",
+                HEALTH_PROBLEMS,
+                index=(
+                    HEALTH_PROBLEMS.index(
+                        patient.get(
+                            "health_problem",
+                            "Other"
+                        )
+                    )
+                    if patient.get(
+                        "health_problem",
+                        "Other"
+                    ) in HEALTH_PROBLEMS
+                    else len(HEALTH_PROBLEMS) - 1
+                ),
+                key="edit_problem"
+            )
+
+        st.markdown("### Clinical Information")
+
+        history = st.text_area(
+            "Medical History",
+            value=patient.get("history", "")
         )
+
+        symptoms = st.text_area(
+            "Symptoms / Presenting Condition",
+            value=patient.get("symptoms", "")
+        )
+
+        investigations = st.text_area(
+            "Investigations",
+            value=patient.get("investigations", "")
+        )
+
+        current_care = st.text_area(
+            "Current Care / Management",
+            value=patient.get("current_care", "")
+        )
+
+        ethical_issue = st.text_area(
+            "Ethical Issue",
+            value=patient.get("ethical_issue", "")
+        )
+
+        st.markdown("### Vital Information")
+
+        v1, v2, v3, v4 = st.columns(4)
+
+        with v1:
+
+            bp = st.text_input(
+                "Blood Pressure",
+                value=patient.get(
+                    "blood_pressure",
+                    ""
+                )
+            )
+
+        with v2:
+
+            hr = st.number_input(
+                "Heart Rate",
+                min_value=0,
+                max_value=250,
+                value=int(
+                    patient.get(
+                        "heart_rate",
+                        0
+                    )
+                )
+            )
+
+        with v3:
+
+            temp = st.number_input(
+                "Temperature",
+                min_value=0.0,
+                max_value=50.0,
+                value=float(
+                    patient.get(
+                        "temperature",
+                        0.0
+                    )
+                ),
+                step=0.1
+            )
+
+        with v4:
+
+            spo2 = st.number_input(
+                "SpO2",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(
+                    patient.get(
+                        "spo2",
+                        0.0
+                    )
+                ),
+                step=1.0
+            )
+
+        if st.button(
+            "Create Case & Run Analysis",
+            type="primary"
+        ):
+
+            patient["patient_id"] = st.session_state.edit_patient_id
+            patient["name"] = st.session_state.edit_name
+            patient["age"] = st.session_state.edit_age
+            patient["gender"] = st.session_state.edit_gender
+            patient["health_problem"] = st.session_state.edit_problem
+
+            patient["history"] = history
+            patient["symptoms"] = symptoms
+            patient["investigations"] = investigations
+            patient["current_care"] = current_care
+            patient["ethical_issue"] = ethical_issue
+
+            patient["blood_pressure"] = bp
+            patient["heart_rate"] = hr
+            patient["temperature"] = temp
+            patient["spo2"] = spo2
+
+            case_id = create_case(patient)
+
+            st.success(
+                f"{case_id} created successfully!"
+            )
+
+            st.info(
+                "The urgency, decision options and MCDM analysis have been generated."
+            )
 
 
 # ============================================================
-# 3. CASES
+# CASES
 # ============================================================
 
-elif page == "📁 Cases":
+elif page == "Cases":
 
-    st.title("Cases")
+    st.markdown(
+        '<div class="section-title">Cases</div>',
+        unsafe_allow_html=True
+    )
 
     search = st.text_input(
-        "🔎 Search by Patient ID, Case ID or condition"
+        "Search cases",
+        placeholder="Search by patient ID, case ID or health problem..."
     )
 
-    filtered = []
-
-    for case in st.session_state.cases:
+    for case_id, case in st.session_state.cases.items():
 
         searchable = (
-            case["case_id"] +
-            case["patient_id"] +
-            case["problem"]
+            case_id +
+            " " +
+            str(case.get("patient_id", "")) +
+            " " +
+            str(case.get("health_problem", ""))
         ).lower()
 
-        if search.lower() in searchable:
-            filtered.append(case)
-
-    st.write(f"Showing **{len(filtered)}** case(s)")
-
-    for case in filtered:
-
-        urgency_icon = urgency_color(case["urgency"])
-
-        with st.container():
-
-            st.markdown(
-                f"""
-                <div class="card">
-                <h3>{case['case_id']} — {case['patient_id']}</h3>
-                <b>Condition:</b> {case['problem']}<br>
-                <b>Status:</b> {case['status']}<br>
-                <b>Urgency:</b> {urgency_icon} {case['urgency']}<br>
-                <b>Assigned to:</b> {case['assigned_to']}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            if st.button(
-                f"Open {case['case_id']}",
-                key=f"open_{case['case_id']}"
-            ):
-                st.session_state.selected_case_id = case["case_id"]
-                st.success(
-                    f"{case['case_id']} selected."
-                )
-
-
-# ============================================================
-# 4. PATIENT CARE URGENCY
-# ============================================================
-
-elif page == "🚨 Patient Care Urgency":
-
-    st.title("Urgency Assessment")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids,
-        index=case_ids.index(
-            st.session_state.selected_case_id
-        )
-    )
-
-    case = get_selected_case(selected_id)
-
-    st.session_state.selected_case_id = selected_id
-
-    st.markdown(
-        f"""
-        <div class="card">
-        <b>Patient ID:</b> {case['patient_id']}<br>
-        <b>Condition:</b> {case['problem']}<br>
-        <b>Urgency:</b> {urgency_color(case['urgency'])} {case['urgency']}<br>
-        <b>Time Sensitivity:</b> {case['time_sensitive']}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "Urgency Level",
-            case["urgency"]
-        )
-
-    with c2:
-        st.metric(
-            "Time Window",
-            case["time_sensitive"]
-        )
-
-    with c3:
-        st.metric(
-            "Critical Flag",
-            "Yes" if case["critical_flag"] else "No"
-        )
-
-    st.subheader("Priority Alerts")
-
-    alerts = []
-
-    if case["urgency"] in ["High", "Critical"]:
-        alerts.append(
-            "High clinical urgency detected."
-        )
-
-    if case["time_sensitive"] != "Routine":
-        alerts.append(
-            "Urgency review may be required."
-        )
-
-    if not case["human_reviewed"]:
-        alerts.append(
-            "Human clinical review recommended."
-        )
-
-    for alert in alerts:
-        st.warning("⚠️ " + alert)
-
-    if case["urgency"] in ["High", "Critical"]:
-        st.markdown(
-            """
-            <div class="danger-card">
-            <b>⚠️ Urgent case flagged.</b><br>
-            Please review the clinical information and decision alternatives.
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-
-# ============================================================
-# 5. CLINICAL INFORMATION
-# ============================================================
-
-elif page == "🧬 Clinical Information":
-
-    st.title("Clinical Information")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    st.markdown(
-        f"""
-        <div class="card">
-        <h3>{case['patient_id']}</h3>
-        <b>Age:</b> {case['age']} |
-        <b>Gender:</b> {case['gender']}<br>
-        <b>Condition:</b> {case['problem']}<br>
-        <b>Urgency:</b> {urgency_color(case['urgency'])} {case['urgency']}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Medical History",
-        "Current Status",
-        "Investigations",
-        "Current Care",
-        "Decision Options"
-    ])
-
-    with tab1:
-
-        st.subheader("Medical History")
-
-        for item in case["medical_history"]:
-            st.markdown("• " + item)
-
-        st.write(
-            "**Allergies:**",
-            case["allergies"]
-        )
-
-        st.write(
-            "**Current Medications:**",
-            case["medications"]
-        )
-
-    with tab2:
-
-        st.subheader("Current Clinical Status")
-
-        st.write(case["symptoms"])
-
-        if case["vitals"]:
-
-            for key, value in case["vitals"].items():
-
-                st.metric(
-                    key,
-                    value
-                )
-
-        if case["findings"]:
-
-            st.subheader("Relevant Findings")
-
-            for finding in case["findings"]:
-                st.markdown("• " + finding)
-
-    with tab3:
-
-        st.subheader("Clinical Investigations")
-
-        for item in case["investigations"]:
-            st.markdown("• " + item)
-
-    with tab4:
-
-        st.subheader("Current Care")
-
-        st.write(
-            case["current_care"]
-        )
-
-        st.subheader("Response to Care")
-
-        st.write(
-            case["response_to_care"]
-        )
-
-    with tab5:
-
-        st.subheader("Available Decision Options")
-
-        for option in case["options"]:
-
-            st.markdown(
-                f"""
-                <div class="option-card">
-                <h3>{option['name']}</h3>
-                <b>Urgency:</b> {option['urgency']}<br>
-                {option['description']}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-
-# ============================================================
-# 6. AI DECISION SUPPORT
-# ============================================================
-
-elif page == "🤖 AI Decision Support":
-
-    st.title("AI Decision Support")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    st.subheader("AI Analysis")
-
-    st.markdown(
-        """
-        <div class="info-card">
-        <b>Clinical Information Analysis</b><br>
-        Key clinical information has been organized for decision support.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        """
-        <div class="info-card">
-        <b>Ethical Issue Identification</b><br>
-        Potential ethical considerations are highlighted for human review.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        """
-        <div class="info-card">
-        <b>Scenario Analysis</b><br>
-        The available decision alternatives are compared using transparent
-        prototype scoring.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    weights, scores, totals, ranking = calculate_mcdm(
-        case["options"]
-    )
-
-    best_option = ranking[0][0]
-
-    st.markdown(
-        f"""
-        <div class="success-card">
-        <h3>🤖 Suggested Option</h3>
-        <h2>{best_option}</h2>
-        <b>Reasoning:</b><br>
-        This option currently provides the highest weighted score under
-        the prototype's predefined criteria.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.write("### Key Factors")
-
-    st.write(
-        "• Expected benefit\n"
-        "\n• Safety\n"
-        "\n• Recovery probability\n"
-        "\n• Resource availability\n"
-        "\n• Ethical acceptability\n"
-        "\n• Patient preference"
-    )
-
-    st.warning(
-        "This is an AI-assisted decision-support prototype. "
-        "It does not diagnose, prescribe, or replace professional clinical judgment."
-    )
-
-
-# ============================================================
-# 7. MCDM ANALYSIS
-# ============================================================
-
-elif page == "📊 MCDM Analysis":
-
-    st.title("MCDM Analysis")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    weights, scores, totals, ranking = calculate_mcdm(
-        case["options"]
-    )
-
-    st.subheader("Selected Criteria & Weights")
-
-    weight_cols = st.columns(3)
-
-    for i, (criterion, weight) in enumerate(weights.items()):
-
-        with weight_cols[i % 3]:
-            st.metric(
-                criterion,
-                f"{weight * 100:.0f}%"
-            )
-
-    st.subheader("Option Scores")
-
-    for option in case["options"]:
-
-        st.markdown(
-            f"### {option['name']}"
-        )
-
-        score_cols = st.columns(6)
-
-        values = [
-            option["benefit"],
-            10 - option["risk"],
-            option["benefit"],
-            10 - option["resource"],
-            option["ethics"],
-            option["preference"]
-        ]
-
-        for i, value in enumerate(values):
-
-            with score_cols[i]:
-
-                labels = [
-                    "Benefit",
-                    "Safety",
-                    "Recovery",
-                    "Resources",
-                    "Ethics",
-                    "Preference"
-                ]
-
-                st.metric(
-                    labels[i],
-                    f"{value}/10"
-                )
-
-    st.subheader("Weighted Calculation")
-
-    st.markdown(
-        """
-        **Weighted Score = Σ (Criterion Weight × Criterion Score)**
-
-        Each criterion contributes according to its predefined weight.
-        """
-    )
-
-    for option_name, total in totals.items():
-
-        st.write(
-            f"**{option_name} = {total:.2f} / 1.00**"
-        )
-
-        st.progress(
-            min(float(total), 1.0)
-        )
-
-    st.subheader("Ranking")
-
-    for rank, (option, score) in enumerate(ranking, start=1):
-
-        medal = ["🥇", "🥈", "🥉"][rank - 1]
+        if search.lower() not in searchable:
+            continue
 
         st.markdown(
             f"""
             <div class="card">
-            <h3>{medal} {rank}. {option}</h3>
-            <div class="big-score">{score:.2f}</div>
+
+                <div class="card-title">
+                    {case_id}
+                </div>
+
+                <div class="card-text">
+
+                    Patient:
+                    {case.get("patient_id", "Unknown")}
+                    <br>
+
+                    Problem:
+                    {case.get("health_problem", "Unknown")}
+                    <br>
+
+                    Urgency:
+                    {case.get("urgency", "Unknown")}
+                    <br>
+
+                    Status:
+                    {case.get("status", "Unknown")}
+
+                </div>
+
             </div>
             """,
             unsafe_allow_html=True
         )
 
+        if st.button(
+            f"Open {case_id}",
+            key=f"open_{case_id}"
+        ):
+
+            st.session_state.selected_case = case_id
+
+            st.success(
+                f"{case_id} selected."
+            )
+
 
 # ============================================================
-# 8. TRADE-OFF ANALYSIS
+# PATIENT CARE URGENCY
 # ============================================================
 
-elif page == "⚖️ Trade-off Analysis":
-
-    st.title("Trade-off Analysis")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    weights, scores, totals, ranking = calculate_mcdm(
-        case["options"]
-    )
+elif page == "Patient Care Urgency":
 
     st.markdown(
-        """
-        <div class="info-card">
-        Trade-off analysis compares expected benefit, safety,
-        resources, ethical acceptability and patient preference.
-        </div>
-        """,
+        '<div class="section-title">Patient Care Urgency</div>',
         unsafe_allow_html=True
     )
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "Benefits vs Risks",
-        "Resources",
-        "Ethical Factors",
-        "Patient Preference"
-    ])
+    case = get_selected_case()
 
-    with tab1:
+    if not case:
 
-        st.subheader("Benefits vs Risks")
+        st.warning(
+            "Select a case from the Cases page first."
+        )
 
-        for option in case["options"]:
+    else:
 
-            benefit = option["benefit"]
-            risk = option["risk"]
+        urgency = case.get(
+            "urgency",
+            "Unknown"
+        )
 
-            tradeoff = benefit - risk
+        st.metric(
+            "Urgency Level",
+            urgency
+        )
+
+        st.write(
+            "**Time Sensitivity:**",
+            case.get(
+                "time_sensitivity",
+                "Not specified"
+            )
+        )
+
+        if urgency == "High":
 
             st.markdown(
-                f"""
-                <div class="option-card">
-                <h3>{option['name']}</h3>
-                <b>Expected Benefit:</b> {benefit}/10<br>
-                <b>Risk Burden:</b> {risk}/10<br>
-                <b>Benefit − Risk:</b> {tradeoff:+d}<br>
-                <b>Urgency:</b> {option['urgency']}
+                """
+                <div class="danger-box">
+                🚨 High-priority case. Human clinical review should be prioritized.
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-    with tab2:
+        elif urgency == "Medium":
 
-        st.subheader("Resource Trade-off")
-
-        for option in case["options"]:
-
-            resource = option["resource"]
-
-            st.write(
-                f"**{option['name']}** — Resource burden: "
-                f"{resource}/10"
-            )
-
-            st.progress(
-                resource / 10
-            )
-
-    with tab3:
-
-        st.subheader("Ethical Acceptability")
-
-        for option in case["options"]:
-
-            st.write(
-                f"**{option['name']}** — "
-                f"{option['ethics']}/10"
-            )
-
-    with tab4:
-
-        st.subheader("Patient Preference")
-
-        for option in case["options"]:
-
-            st.write(
-                f"**{option['name']}** — "
-                f"{option['preference']}/10"
-            )
-
-    st.subheader("Overall Mathematical Trade-off")
-
-    for option_name, score in totals.items():
-
-        st.write(
-            f"**{option_name} → Weighted utility = {score:.2f}**"
-        )
-
-    st.success(
-        f"Current mathematical ranking: "
-        f"**{ranking[0][0]}** with a score of "
-        f"**{ranking[0][1]:.2f}**."
-    )
-
-
-# ============================================================
-# 9. STAKEHOLDER OPINIONS
-# ============================================================
-
-elif page == "👥 Stakeholder Opinions":
-
-    st.title("Stakeholder Opinions")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    stakeholder_names = [
-        "Treating Doctor",
-        "Independent Physician",
-        "Ethics Committee",
-        "Patient"
-    ]
-
-    option_names = [
-        option["name"]
-        for option in case["options"]
-    ]
-
-    for stakeholder in stakeholder_names:
-
-        data = case["stakeholders"][stakeholder]
-
-        st.markdown(
-            f"""
-            <div class="stakeholder">
-            <h3>👤 {stakeholder}</h3>
-            <b>Current Preference:</b>
-            {data.get('choice', 'Not provided')}<br>
-            <b>Risk Assessment:</b>
-            {data.get('risk', 'Not assessed')}<br>
-            <b>Reason:</b>
-            {data.get('reason', 'Not provided')}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        choice = st.selectbox(
-            f"{stakeholder} — preferred option",
-            ["Not selected"] + option_names,
-            index=(
-                option_names.index(data["choice"]) + 1
-                if data.get("choice") in option_names
-                else 0
-            ),
-            key=f"choice_{selected_id}_{stakeholder}"
-        )
-
-        reason = st.text_area(
-            f"{stakeholder} — reasoning",
-            value=data.get("reason", ""),
-            key=f"reason_{selected_id}_{stakeholder}"
-        )
-
-        if st.button(
-            f"Save {stakeholder}",
-            key=f"save_{selected_id}_{stakeholder}"
-        ):
-
-            if choice != "Not selected":
-
-                case["stakeholders"][stakeholder]["choice"] = choice
-
-            case["stakeholders"][stakeholder]["reason"] = reason
-
-            add_audit(
-                selected_id,
-                stakeholder,
-                "Opinion Added",
-                f"Preferred option: {choice}"
-            )
-
-            st.success(
-                f"{stakeholder} opinion saved."
-            )
-
-    agreement, common_choice, counts = stakeholder_summary(
-        case
-    )
-
-    st.subheader("Opinion Comparison")
-
-    if common_choice:
-
-        st.metric(
-            "Current Agreement",
-            f"{agreement}%"
-        )
-
-        for option in option_names:
-
-            count = counts.get(option, 0)
-
-            st.write(
-                f"**{option}** — {count} stakeholder(s)"
-            )
-
-            st.progress(
-                count / 4
-            )
-
-        if agreement < 75:
-
-            st.error(
-                "⚠️ Stakeholder disagreement detected."
+            st.markdown(
+                """
+                <div class="warning-box">
+                ⚠️ Moderate-priority case requiring clinical review.
+                </div>
+                """,
+                unsafe_allow_html=True
             )
 
         else:
 
-            st.success(
-                "Stakeholder agreement is currently strong."
+            st.markdown(
+                """
+                <div class="success-box">
+                ✓ Lower urgency based on the available extracted information.
+                </div>
+                """,
+                unsafe_allow_html=True
             )
 
+        st.markdown("### Critical Clinical Information")
 
-# ============================================================
-# 10. CONSENSUS MANAGEMENT
-# ============================================================
-
-elif page == "🤝 Consensus Management":
-
-    st.title("Consensus Management")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    agreement, common_choice, counts = stakeholder_summary(
-        case
-    )
-
-    st.metric(
-        "Consensus Percentage",
-        f"{agreement}%"
-    )
-
-    if agreement >= 75:
-        st.success(
-            f"Consensus status: Strong agreement around {common_choice}"
+        st.write(
+            f"**Symptoms:** {case.get('symptoms', 'Not available')}"
         )
-    else:
+
+        st.write(
+            f"**Blood Pressure:** {case.get('blood_pressure', 'Not available')}"
+        )
+
+        st.write(
+            f"**Heart Rate:** {case.get('heart_rate', 'Not available')}"
+        )
+
+        st.write(
+            f"**SpO2:** {case.get('spo2', 'Not available')}"
+        )
+
+
+# ============================================================
+# CLINICAL INFORMATION
+# ============================================================
+
+elif page == "Clinical Information":
+
+    st.markdown(
+        '<div class="section-title">Clinical Information</div>',
+        unsafe_allow_html=True
+    )
+
+    case = get_selected_case()
+
+    if not case:
+
         st.warning(
-            "Consensus status: Partial consensus / disagreement"
+            "Select a case from the Cases page first."
         )
 
-    st.subheader("Opinion Comparison")
-
-    stakeholders = case["stakeholders"]
-
-    for person, data in stakeholders.items():
-
-        choice = data.get(
-            "choice",
-            "Not selected"
-        )
+    else:
 
         st.markdown(
             f"""
             <div class="card">
-            <b>{person}</b><br>
-            Preference: {choice}<br>
-            Reason: {data.get('reason', '')}
+
+            <div class="card-title">
+            {case.get("patient_id", "Patient")}
+            </div>
+
+            <div class="card-text">
+
+            <b>Health Problem:</b>
+            {case.get("health_problem", "Not specified")}
+
+            <br><br>
+
+            <b>Age:</b>
+            {case.get("age", "Not available")}
+
+            <br>
+
+            <b>Gender:</b>
+            {case.get("gender", "Not available")}
+
+            </div>
+
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    st.subheader("Consensus Actions")
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
+            [
+                "Medical History",
+                "Current Status",
+                "Investigations",
+                "Current Care",
+                "Decision Options"
+            ]
+        )
 
-    a1, a2 = st.columns(2)
+        with tab1:
 
-    with a1:
-
-        if st.button(
-            "Request Discussion",
-            use_container_width=True
-        ):
-
-            add_notification(
-                f"Discussion requested for {selected_id}.",
-                "Pending"
+            st.write(
+                case.get(
+                    "history",
+                    "No medical history extracted."
+                )
             )
 
-            add_audit(
-                selected_id,
-                "System",
-                "Consensus Discussion",
-                "Stakeholder discussion requested."
+        with tab2:
+
+            st.write(
+                f"**Symptoms:** {case.get('symptoms', 'Not available')}"
             )
 
-            st.success(
-                "Discussion request recorded."
+            st.write(
+                f"**Blood Pressure:** {case.get('blood_pressure', 'Not available')}"
             )
 
-    with a2:
-
-        if st.button(
-            "Request Further Review",
-            use_container_width=True
-        ):
-
-            add_notification(
-                f"Further review requested for {selected_id}.",
-                "Pending"
+            st.write(
+                f"**Heart Rate:** {case.get('heart_rate', 'Not available')}"
             )
 
-            add_audit(
-                selected_id,
-                "System",
-                "Further Review",
-                "Additional clinical review requested."
+            st.write(
+                f"**Temperature:** {case.get('temperature', 'Not available')}"
             )
 
-            st.success(
-                "Further review recorded."
+            st.write(
+                f"**SpO2:** {case.get('spo2', 'Not available')}"
+            )
+
+        with tab3:
+
+            st.write(
+                case.get(
+                    "investigations",
+                    "No investigations extracted."
+                )
+            )
+
+        with tab4:
+
+            st.write(
+                case.get(
+                    "current_care",
+                    "No current care information extracted."
+                )
+            )
+
+        with tab5:
+
+            options = case.get(
+                "options",
+                {}
+            )
+
+            for key, option in options.items():
+
+                st.markdown(
+                    f"""
+                    <div class="card">
+
+                    <div class="card-title">
+                    {key} — {option["name"]}
+                    </div>
+
+                    <div class="card-text">
+
+                    Benefit: {option["benefit"]}/10<br>
+                    Risk: {option["risk"]}/10<br>
+                    Resource Requirement: {option["resources"]}/10<br>
+                    Ethical Acceptability: {option["ethics"]}/10<br>
+                    Patient Preference: {option["patient"]}/10
+
+                    </div>
+
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+
+# ============================================================
+# AI DECISION SUPPORT
+# ============================================================
+
+elif page == "AI Decision Support":
+
+    st.markdown(
+        '<div class="section-title">AI Decision Support</div>',
+        unsafe_allow_html=True
+    )
+
+    case = get_selected_case()
+
+    if not case:
+
+        st.warning(
+            "Select a case first."
+        )
+
+    else:
+
+        ranking = case.get(
+            "ranking",
+            []
+        )
+
+        if ranking:
+
+            best_option = ranking[0][0]
+
+            option_name = case["options"][
+                best_option
+            ]["name"]
+
+            st.markdown(
+                f"""
+                <div class="info-box">
+
+                <b>Prototype AI Recommendation:</b>
+
+                {best_option} — {option_name}
+
+                <br><br>
+
+                This recommendation is generated from the prototype's
+                transparent scoring framework and extracted case information.
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown("### Clinical Factors")
+
+            st.write(
+                f"**Health Problem:** {case.get('health_problem')}"
+            )
+
+            st.write(
+                f"**Urgency:** {case.get('urgency')}"
+            )
+
+            st.write(
+                f"**Symptoms:** {case.get('symptoms')}"
+            )
+
+            st.markdown("### Ethical Issue")
+
+            st.write(
+                case.get(
+                    "ethical_issue",
+                    "No ethical issue extracted."
+                )
+            )
+
+            st.markdown(
+                """
+                <div class="warning-box">
+                ⚠️ This is a clinical decision-support prototype,
+                not a diagnostic or prescribing system.
+                Human clinical judgment remains necessary.
+                </div>
+                """,
+                unsafe_allow_html=True
             )
 
 
 # ============================================================
-# 11. DECISION TRANSPARENCY
+# MCDM ANALYSIS
 # ============================================================
 
-elif page == "🔍 Decision Transparency":
+elif page == "MCDM Analysis":
 
-    st.title("Decision Transparency")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
+    st.markdown(
+        '<div class="section-title">MCDM Analysis</div>',
+        unsafe_allow_html=True
     )
 
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
+    case = get_selected_case()
 
-    weights, scores, totals, ranking = calculate_mcdm(
-        case["options"]
-    )
+    if not case:
 
-    agreement, common_choice, counts = stakeholder_summary(
-        case
-    )
-
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "Evidence",
-        "Data Sources",
-        "Calculations",
-        "History"
-    ])
-
-    with tab1:
-
-        st.subheader("Evidence Considered")
-
-        evidence = [
-            "Clinical history",
-            "Current clinical status",
-            "Relevant symptoms/findings",
-            "Clinical investigations",
-            "Current care",
-            "Urgency and time sensitivity",
-            "Ethical issue",
-            "Patient preference"
-        ]
-
-        for item in evidence:
-            st.markdown("✦ " + item)
-
-    with tab2:
-
-        st.subheader("Clinical Data Sources")
-
-        st.write(
-            "• Patient-entered clinical information"
+        st.warning(
+            "Select a case first."
         )
 
-        st.write(
-            "• Clinical investigation information"
+    else:
+
+        weights = case.get(
+            "mcdm_weights",
+            {}
         )
 
-        st.write(
-            "• Stakeholder opinions"
+        scores = case.get(
+            "mcdm_scores",
+            {}
         )
 
-        st.write(
-            "• Prototype MCDM criteria"
+        ranking = case.get(
+            "ranking",
+            []
         )
 
-    with tab3:
-
-        st.subheader("MCDM Calculation")
+        st.markdown("### Criteria Weights")
 
         for criterion, weight in weights.items():
 
             st.write(
-                f"{criterion}: {weight * 100:.0f}%"
+                f"**{criterion}:** {weight * 100:.0f}%"
             )
 
-        st.markdown("---")
+        st.markdown("### Option Scores")
 
-        for option, score in totals.items():
-
-            st.write(
-                f"**{option} → {score:.2f}**"
-            )
-
-        st.subheader("Stakeholder Agreement")
-
-        st.write(
-            f"Consensus percentage: **{agreement}%**"
-        )
-
-        if common_choice:
-            st.write(
-                f"Most selected stakeholder option: "
-                f"**{common_choice}**"
-            )
-
-    with tab4:
-
-        st.subheader("Decision History")
-
-        history = [
-            item
-            for item in st.session_state.audit
-            if item["case_id"] == selected_id
-        ]
-
-        for item in history:
+        for key, score in scores.items():
 
             st.markdown(
                 f"""
-                **{item['time']}** — {item['action']}  
-                {item['user']}: {item['details']}
-                """
+                <div class="card">
+
+                <div class="card-title">
+                {key} — {case["options"][key]["name"]}
+                </div>
+
+                <div class="card-text">
+
+                Weighted Utility Score:
+                <b>{score:.2f}/10</b>
+
+                </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown("### Ranking")
+
+        for i, (key, score) in enumerate(
+            ranking,
+            start=1
+        ):
+
+            st.write(
+                f"**{i}. {key} — "
+                f"{case['options'][key]['name']} "
+                f"({score:.2f}/10)**"
             )
 
 
 # ============================================================
-# 12. FINAL HUMAN DECISION
+# TRADE-OFF ANALYSIS
 # ============================================================
 
-elif page == "✅ Final Human Decision":
-
-    st.title("Final Human Decision")
-
-    selected_id = st.selectbox(
-        "Select Case",
-        case_ids
-    )
-
-    case = get_selected_case(selected_id)
-    st.session_state.selected_case_id = selected_id
-
-    weights, scores, totals, ranking = calculate_mcdm(
-        case["options"]
-    )
-
-    ai_recommendation = ranking[0][0]
+elif page == "Trade-off Analysis":
 
     st.markdown(
-        f"""
-        <div class="success-card">
-        <h3>🤖 AI Recommendation</h3>
-        <h2>{ai_recommendation}</h2>
-        <b>Mathematical Score:</b>
-        {ranking[0][1]:.2f}
-        </div>
-        """,
+        '<div class="section-title">Trade-off Analysis</div>',
         unsafe_allow_html=True
     )
 
-    st.subheader("Human Review")
+    case = get_selected_case()
 
-    decision_options = [
-        option["name"]
-        for option in case["options"]
-    ]
+    if not case:
 
-    final_choice = st.radio(
-        "Final decision",
-        decision_options,
-        index=decision_options.index(
-            ai_recommendation
+        st.warning(
+            "Select a case first."
         )
-    )
 
-    review_type = st.radio(
-        "Human review",
-        [
-            "Accept AI recommendation",
-            "Modify AI recommendation",
-            "Reject AI recommendation"
-        ]
-    )
+    else:
 
-    justification = st.text_area(
-        "Decision Justification",
-        value=case.get(
-            "decision_justification",
-            ""
-        ),
-        placeholder="Explain the human decision..."
-    )
+        for key, option in case["options"].items():
 
-    reviewed = st.checkbox(
-        "I confirm that this decision has undergone human review."
-    )
-
-    if st.button(
-        "Record Final Decision",
-        type="primary",
-        use_container_width=True
-    ):
-
-        if not reviewed:
-
-            st.error(
-                "Please confirm human review before recording the decision."
+            net = (
+                option["benefit"] -
+                option["risk"]
             )
 
-        else:
+            st.markdown(
+                f"""
+                <div class="card">
 
-            case["final_decision"] = final_choice
+                <div class="card-title">
+                {key} — {option["name"]}
+                </div>
 
-            case["decision_justification"] = justification
+                <div class="card-text">
 
-            case["human_reviewed"] = True
+                <b>Benefit:</b> {option["benefit"]}/10
+                <br>
 
-            case["status"] = "Decision Recorded"
+                <b>Risk:</b> {option["risk"]}/10
+                <br>
 
-            add_audit(
-                selected_id,
-                "Dr. Priya",
-                "Final Decision Recorded",
-                f"Final decision: {final_choice}. "
-                f"Review type: {review_type}."
+                <b>Benefit − Risk:</b> {net}
+                <br>
+
+                <b>Resource Burden:</b> {option["resources"]}/10
+                <br>
+
+                <b>Ethical Acceptability:</b> {option["ethics"]}/10
+                <br>
+
+                <b>Patient Preference:</b> {option["patient"]}/10
+
+                </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
             )
-
-            add_notification(
-                f"Final human decision recorded for {selected_id}.",
-                "Info"
-            )
-
-            st.success(
-                "Final human decision recorded successfully."
-            )
-
-
-# ============================================================
-# 13. AUDIT TRAIL
-# ============================================================
-
-elif page == "📜 Audit Trail":
-
-    st.title("Audit Trail")
-
-    case_filter = st.selectbox(
-        "Filter by Case",
-        ["All Cases"] + case_ids
-    )
-
-    action_filter = st.selectbox(
-        "Filter by Action",
-        ["All Actions"] +
-        sorted(
-            list(
-                set(
-                    item["action"]
-                    for item in st.session_state.audit
-                )
-            )
-        )
-    )
-
-    records = st.session_state.audit
-
-    if case_filter != "All Cases":
-
-        records = [
-            x for x in records
-            if x["case_id"] == case_filter
-        ]
-
-    if action_filter != "All Actions":
-
-        records = [
-            x for x in records
-            if x["action"] == action_filter
-        ]
-
-    for item in records:
 
         st.markdown(
-            f"""
-            <div class="card">
-            <b>{item['action']}</b><br>
-            <span class="small-text">
-            {item['time']} · {item['user']} · {item['case_id']}
-            </span><br>
-            {item['details']}
+            """
+            <div class="info-box">
+            The trade-off analysis compares expected benefit,
+            risk, resource burden, ethical considerations and
+            patient preference before the final human decision.
             </div>
             """,
             unsafe_allow_html=True
@@ -1977,450 +1920,529 @@ elif page == "📜 Audit Trail":
 
 
 # ============================================================
-# 14. NOTIFICATIONS
+# STAKEHOLDER OPINIONS
 # ============================================================
 
-elif page == "🔔 Notifications":
+elif page == "Stakeholder Opinions":
 
-    st.title("Notifications")
+    st.markdown(
+        '<div class="section-title">Stakeholder Opinions</div>',
+        unsafe_allow_html=True
+    )
 
-    urgent_count = len([
-        c for c in st.session_state.cases
-        if c["urgency"] in ["High", "Critical"]
-    ])
+    case = get_selected_case()
 
-    pending_count = len([
-        c for c in st.session_state.cases
-        if not c["human_reviewed"]
-    ])
+    if not case:
 
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "Urgent Cases",
-            urgent_count
-        )
-
-    with c2:
-        st.metric(
-            "Pending Reviews",
-            pending_count
-        )
-
-    with c3:
-        st.metric(
-            "Notifications",
-            len(st.session_state.notifications)
-        )
-
-    st.subheader("Recent Notifications")
-
-    if not st.session_state.notifications:
-
-        st.info(
-            "No additional notifications."
+        st.warning(
+            "Select a case first."
         )
 
     else:
 
-        for notification in st.session_state.notifications:
+        stakeholders = case.get(
+            "stakeholders",
+            {}
+        )
+
+        choices = [
+            "A",
+            "B",
+            "C"
+        ]
+
+        for stakeholder, opinion in stakeholders.items():
+
+            st.markdown(
+                f"### {stakeholder}"
+            )
+
+            option = st.selectbox(
+                "Preferred Option",
+                choices,
+                index=choices.index(
+                    opinion.get("option", "B")
+                ),
+                key=f"stakeholder_{stakeholder}"
+            )
+
+            reason = st.text_area(
+                "Reasoning / Concern",
+                value=opinion.get(
+                    "reason",
+                    ""
+                ),
+                key=f"reason_{stakeholder}"
+            )
+
+            opinion["option"] = option
+            opinion["reason"] = reason
+
+        if st.button("Save Stakeholder Opinions"):
+
+            add_audit(
+                st.session_state.selected_case,
+                "Stakeholder opinions updated."
+            )
+
+            st.success(
+                "Stakeholder opinions saved."
+            )
+
+        opinions = [
+            opinion.get("option")
+            for opinion in stakeholders.values()
+        ]
+
+        disagreement = (
+            len(set(opinions)) > 1
+        )
+
+        if disagreement:
+
+            st.markdown(
+                """
+                <div class="warning-box">
+                ⚠️ Stakeholder disagreement detected.
+                The preferred decisions are not identical.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        else:
+
+            st.markdown(
+                """
+                <div class="success-box">
+                ✓ Stakeholders currently show agreement.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+# ============================================================
+# CONSENSUS MANAGEMENT
+# ============================================================
+
+elif page == "Consensus Management":
+
+    st.markdown(
+        '<div class="section-title">Consensus Management</div>',
+        unsafe_allow_html=True
+    )
+
+    case = get_selected_case()
+
+    if not case:
+
+        st.warning(
+            "Select a case first."
+        )
+
+    else:
+
+        stakeholders = case.get(
+            "stakeholders",
+            {}
+        )
+
+        opinions = [
+            x.get("option")
+            for x in stakeholders.values()
+        ]
+
+        total = len(opinions)
+
+        if total:
+
+            counts = {}
+
+            for opinion in opinions:
+                counts[opinion] = counts.get(
+                    opinion,
+                    0
+                ) + 1
+
+            majority_option = max(
+                counts,
+                key=counts.get
+            )
+
+            agreement = (
+                counts[majority_option] /
+                total
+            ) * 100
+
+            st.metric(
+                "Consensus Agreement",
+                f"{agreement:.0f}%"
+            )
+
+            st.write(
+                f"Majority preference: "
+                f"**{majority_option} — "
+                f"{case['options'][majority_option]['name']}**"
+            )
+
+            if agreement < 100:
+
+                st.warning(
+                    "Disagreement remains. Human discussion/review is required."
+                )
+
+            else:
+
+                st.success(
+                    "All listed stakeholders currently agree."
+                )
+
+        if st.button("Record Consensus Review"):
+
+            add_audit(
+                st.session_state.selected_case,
+                "Consensus review recorded."
+            )
+
+            st.success(
+                "Consensus review recorded."
+            )
+
+
+# ============================================================
+# DECISION TRANSPARENCY
+# ============================================================
+
+elif page == "Decision Transparency":
+
+    st.markdown(
+        '<div class="section-title">Decision Transparency</div>',
+        unsafe_allow_html=True
+    )
+
+    case = get_selected_case()
+
+    if not case:
+
+        st.warning(
+            "Select a case first."
+        )
+
+    else:
+
+        st.markdown("### Data Source")
+
+        st.write(
+            "Patient information source:",
+            case.get(
+                "source_text",
+                "Uploaded patient file"
+            )[:1000]
+        )
+
+        st.markdown("### Calculation Method")
+
+        st.write(
+            "The prototype uses a weighted Multi-Criteria Decision-Making framework."
+        )
+
+        st.write(
+            "Weighted Score = Σ(weight × criterion score)"
+        )
+
+        st.markdown("### Decision Ranking")
+
+        for i, (key, score) in enumerate(
+            case.get("ranking", []),
+            start=1
+        ):
+
+            st.write(
+                f"{i}. {key} — "
+                f"{case['options'][key]['name']} "
+                f"= {score:.2f}/10"
+            )
+
+        st.markdown("### Human Review Status")
+
+        st.write(
+            case.get(
+                "decision_status",
+                "Pending Human Review"
+            )
+        )
+
+
+# ============================================================
+# FINAL HUMAN DECISION
+# ============================================================
+
+elif page == "Final Human Decision":
+
+    st.markdown(
+        '<div class="section-title">Final Human Decision</div>',
+        unsafe_allow_html=True
+    )
+
+    case = get_selected_case()
+
+    if not case:
+
+        st.warning(
+            "Select a case first."
+        )
+
+    else:
+
+        ranking = case.get(
+            "ranking",
+            []
+        )
+
+        ai_option = (
+            ranking[0][0]
+            if ranking
+            else "B"
+        )
+
+        st.markdown(
+            f"""
+            <div class="info-box">
+
+            <b>Prototype AI Recommendation:</b>
+
+            {ai_option} —
+            {case["options"][ai_option]["name"]}
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        decision = st.selectbox(
+            "Human Decision",
+            [
+                "Accept AI Recommendation",
+                "Modify AI Recommendation",
+                "Reject AI Recommendation"
+            ]
+        )
+
+        final_option = st.selectbox(
+            "Final Selected Option",
+            ["A", "B", "C"]
+        )
+
+        justification = st.text_area(
+            "Decision Justification",
+            placeholder="Enter the clinical reasoning for the human decision..."
+        )
+
+        human_review = st.checkbox(
+            "I confirm this decision requires human clinical review."
+        )
+
+        if st.button(
+            "Save Final Decision",
+            type="primary"
+        ):
+
+            if not human_review:
+
+                st.error(
+                    "Please confirm human clinical review."
+                )
+
+            elif not justification.strip():
+
+                st.error(
+                    "Please provide a decision justification."
+                )
+
+            else:
+
+                case["final_decision"] = final_option
+
+                case["decision_type"] = decision
+
+                case["decision_justification"] = justification
+
+                case["decision_status"] = "Human Reviewed"
+
+                case["final_decision_time"] = now()
+
+                add_audit(
+                    st.session_state.selected_case,
+                    f"Final human decision recorded: {final_option}.",
+                    "Human Reviewer"
+                )
+
+                st.success(
+                    "Final human decision saved."
+                )
+
+
+# ============================================================
+# AUDIT TRAIL
+# ============================================================
+
+elif page == "Audit Trail":
+
+    st.markdown(
+        '<div class="section-title">Audit Trail</div>',
+        unsafe_allow_html=True
+    )
+
+    selected = st.session_state.selected_case
+
+    records = [
+        record
+        for record in st.session_state.audit
+        if not selected
+        or record["case_id"] == selected
+    ]
+
+    if records:
+
+        for record in reversed(records):
+
+            st.markdown(
+                f"""
+                <div class="card">
+
+                <div class="card-text">
+
+                <b>{record["timestamp"]}</b>
+                <br>
+
+                Case:
+                {record["case_id"]}
+
+                <br>
+
+                Actor:
+                {record["actor"]}
+
+                <br>
+
+                Action:
+                {record["action"]}
+
+                </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    else:
+
+        st.info(
+            "No audit events available."
+        )
+
+
+# ============================================================
+# NOTIFICATIONS
+# ============================================================
+
+elif page == "Notifications":
+
+    st.markdown(
+        '<div class="section-title">Notifications</div>',
+        unsafe_allow_html=True
+    )
+
+    if not st.session_state.notifications:
+
+        st.info(
+            "No notifications."
+        )
+
+    else:
+
+        for notification in reversed(
+            st.session_state.notifications
+        ):
 
             level = notification["level"]
 
             if level == "Urgent":
-                st.error(
-                    "🚨 " + notification["message"]
-                )
 
-            elif level == "Pending":
-                st.warning(
-                    "⚠️ " + notification["message"]
+                st.error(
+                    f"🚨 {notification['message']}"
                 )
 
             else:
-                st.success(
-                    "✓ " + notification["message"]
+
+                st.info(
+                    notification["message"]
                 )
 
-
-# ============================================================
-# 15. SETTINGS
-# ============================================================
-
-elif page == "⚙️ Settings":
-
-    st.title("Settings")
-
-    st.subheader("Prototype Configuration")
-
-    st.checkbox(
-        "AI Decision Support",
-        value=True
-    )
-
-    st.checkbox(
-        "Human Review Required",
-        value=True
-    )
-
-    st.checkbox(
-        "Audit Trail",
-        value=True
-    )
-
-    st.checkbox(
-        "Stakeholder Consensus Monitoring",
-        value=True
-    )
-
-    st.subheader("MCDM Criteria")
-
-    criteria = {
-        "Expected Benefit": "30%",
-        "Safety": "25%",
-        "Recovery Probability": "20%",
-        "Resource Availability": "10%",
-        "Ethical Acceptability": "10%",
-        "Patient Preference": "5%"
-    }
-
-    for criterion, value in criteria.items():
-
-        st.write(
-            f"**{criterion}** — {value}"
-        )
-
-    st.info(
-        "The criteria and weights are predefined for this prototype. "
-        "They can be made configurable in a future version."
-    )
+            st.caption(
+                notification["time"]
+            )
 
 
 # ============================================================
-# PRINTABLE CASE REPORT
+# SETTINGS
 # ============================================================
 
-st.sidebar.markdown("---")
+elif page == "Settings":
 
-if st.sidebar.button(
-    "🖨️ Generate Case Report",
-    use_container_width=True
-):
-
-    case = selected_case
-
-    weights, scores, totals, ranking = calculate_mcdm(
-        case["options"]
+    st.markdown(
+        '<div class="section-title">Settings</div>',
+        unsafe_allow_html=True
     )
 
-    agreement, common_choice, counts = stakeholder_summary(
-        case
-    )
-
-    stakeholder_html = ""
-
-    for person, data in case["stakeholders"].items():
-
-        stakeholder_html += f"""
-        <tr>
-            <td>{html.escape(person)}</td>
-            <td>{html.escape(data.get("choice", ""))}</td>
-            <td>{html.escape(data.get("reason", ""))}</td>
-        </tr>
+    st.markdown(
         """
+        <div class="card">
 
-    option_html = ""
+        <div class="card-title">
+        EthicSync Prototype
+        </div>
 
-    for option in case["options"]:
+        <div class="card-text">
 
-        option_html += f"""
-        <tr>
-            <td>{html.escape(option["name"])}</td>
-            <td>{option["urgency"]}</td>
-            <td>{option["benefit"]}/10</td>
-            <td>{option["risk"]}/10</td>
-            <td>{totals[option["name"]]:.2f}</td>
-        </tr>
-        """
+        <b>Application:</b>
+        Clinical Decision-Support Prototype
 
-    report = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <title>EthicSync Case Report - {case['case_id']}</title>
+        <br><br>
 
-    <style>
+        <b>Data Input:</b>
+        Patient file upload
 
-    body {{
-        font-family: Arial, sans-serif;
-        margin: 40px;
-        color: #222;
-    }}
+        <br><br>
 
-    h1 {{
-        color: #123b5d;
-    }}
+        <b>Decision Framework:</b>
+        Multi-Criteria Decision-Making
 
-    h2 {{
-        color: #195d85;
-        border-bottom: 1px solid #ccc;
-        padding-bottom: 5px;
-    }}
+        <br><br>
 
-    table {{
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 25px;
-    }}
+        <b>Human Oversight:</b>
+        Required
 
-    th, td {{
-        border: 1px solid #ccc;
-        padding: 8px;
-        text-align: left;
-    }}
+        </div>
 
-    th {{
-        background: #edf5fa;
-    }}
-
-    .box {{
-        border: 1px solid #ccc;
-        padding: 15px;
-        margin-bottom: 15px;
-    }}
-
-    .warning {{
-        background: #fff4d6;
-        padding: 15px;
-        border: 1px solid #e4c66b;
-    }}
-
-    @media print {{
-        .no-print {{
-            display: none;
-        }}
-    }}
-
-    </style>
-
-    </head>
-
-    <body>
-
-    <h1>⚕️ EthicSync</h1>
-    <h3>Clinical Decision Support Report</h3>
-
-    <div class="box">
-    <b>Case ID:</b> {case['case_id']}<br>
-    <b>Patient ID:</b> {case['patient_id']}<br>
-    <b>Age:</b> {case['age']}<br>
-    <b>Gender:</b> {case['gender']}<br>
-    <b>Condition:</b> {case['problem']}<br>
-    <b>Urgency:</b> {case['urgency']}<br>
-    <b>Time Sensitivity:</b> {case['time_sensitive']}<br>
-    <b>Status:</b> {case['status']}
-    </div>
-
-    <h2>Clinical Summary</h2>
-
-    <div class="box">
-    <b>Symptoms / Clinical Status</b><br>
-    {html.escape(case['symptoms'])}
-    </div>
-
-    <div class="box">
-    <b>Medical History</b><br>
-    {'<br>'.join([html.escape(x) for x in case['medical_history']])}
-    </div>
-
-    <div class="box">
-    <b>Investigations</b><br>
-    {'<br>'.join([html.escape(x) for x in case['investigations']])}
-    </div>
-
-    <div class="box">
-    <b>Current Care</b><br>
-    {html.escape(case['current_care'])}
-    </div>
-
-    <div class="box">
-    <b>Response to Care</b><br>
-    {html.escape(case['response_to_care'])}
-    </div>
-
-    <h2>Urgency Assessment</h2>
-
-    <div class="box">
-    <b>Urgency Level:</b> {case['urgency']}<br>
-    <b>Time Sensitivity:</b> {case['time_sensitive']}<br>
-    <b>Critical Flag:</b> {'Yes' if case['critical_flag'] else 'No'}
-    </div>
-
-    <h2>Ethical Issue</h2>
-
-    <div class="box">
-    {html.escape(case['ethical_issue'])}
-    </div>
-
-    <h2>Available Decision Options</h2>
-
-    <table>
-    <tr>
-        <th>Option</th>
-        <th>Urgency</th>
-        <th>Benefit</th>
-        <th>Risk</th>
-        <th>Weighted Score</th>
-    </tr>
-
-    {option_html}
-
-    </table>
-
-    <h2>MCDM Calculation</h2>
-
-    <div class="box">
-
-    <b>Formula:</b><br>
-
-    Weighted Score = Σ (Criterion Weight × Criterion Score)
-
-    <br><br>
-
-    <b>Criteria:</b><br>
-
-    Expected Benefit: 30%<br>
-    Safety: 25%<br>
-    Recovery Probability: 20%<br>
-    Resource Availability: 10%<br>
-    Ethical Acceptability: 10%<br>
-    Patient Preference: 5%
-
-    </div>
-
-    <h2>Ranking</h2>
-
-    <ol>
-    """
-
-    for option, score in ranking:
-
-        report += f"""
-        <li>
-        <b>{html.escape(option)}</b>
-        — {score:.2f}
-        </li>
-        """
-
-    report += f"""
-
-    </ol>
-
-    <h2>Stakeholder Opinions</h2>
-
-    <table>
-
-    <tr>
-        <th>Stakeholder</th>
-        <th>Preferred Option</th>
-        <th>Reasoning</th>
-    </tr>
-
-    {stakeholder_html}
-
-    </table>
-
-    <h2>Consensus</h2>
-
-    <div class="box">
-
-    <b>Consensus Percentage:</b> {agreement}%<br>
-
-    <b>Most Selected Option:</b>
-    {html.escape(common_choice or 'Not available')}
-
-    </div>
-
-    <h2>Final Human Decision</h2>
-
-    <div class="box">
-
-    <b>Final Decision:</b>
-    {html.escape(case.get('final_decision', '') or 'Not recorded')}
-    <br><br>
-
-    <b>Human Review:</b>
-    {'Completed' if case.get('human_reviewed') else 'Pending'}
-
-    <br><br>
-
-    <b>Justification:</b><br>
-    {html.escape(case.get('decision_justification', '') or 'Not recorded')}
-
-    </div>
-
-    <h2>Audit History</h2>
-
-    <table>
-
-    <tr>
-        <th>Date / Time</th>
-        <th>User</th>
-        <th>Action</th>
-        <th>Details</th>
-    </tr>
-    """
-
-    for item in st.session_state.audit:
-
-        if item["case_id"] == case["case_id"]:
-
-            report += f"""
-            <tr>
-                <td>{html.escape(item['time'])}</td>
-                <td>{html.escape(item['user'])}</td>
-                <td>{html.escape(item['action'])}</td>
-                <td>{html.escape(item['details'])}</td>
-            </tr>
-            """
-
-    report += """
-
-    </table>
-
-    <div class="warning">
-
-    <b>Human Review Disclaimer</b><br>
-
-    EthicSync is a clinical decision-support prototype.
-    Its outputs are intended to organize information,
-    compare decision alternatives and improve transparency.
-    It does not diagnose disease, prescribe treatment or replace
-    qualified healthcare professionals.
-
-    </div>
-
-    <br>
-
-    <button class="no-print" onclick="window.print()">
-    Print / Save as PDF
-    </button>
-
-    </body>
-    </html>
-    """
-
-    st.sidebar.download_button(
-        "📄 Download Printable Report",
-        data=report,
-        file_name=f"{case['case_id']}_EthicSync_Report.html",
-        mime="text/html",
-        use_container_width=True
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.sidebar.success(
-        "Report generated. Open the HTML file and choose Print → Save as PDF."
+    st.markdown("### Supported Patient Files")
+
+    st.write(
+        "TXT, CSV, JSON, PDF, DOCX and XLSX"
+    )
+
+    st.markdown("### Important")
+
+    st.warning(
+        "The current prototype uses transparent rule-based extraction "
+        "and scoring. It should not be presented as a clinically validated "
+        "AI diagnostic system."
     )
 
 
@@ -2428,9 +2450,16 @@ if st.sidebar.button(
 # FOOTER
 # ============================================================
 
-st.markdown("---")
-
-st.caption(
-    "EthicSync • AI-assisted clinical decision-support prototype • "
-    "Human oversight required"
+st.markdown(
+    """
+    <br><br>
+    <div style="
+        text-align:center;
+        color:#64748b !important;
+        font-size:12px;">
+        EthicSync • Clinical Decision-Support Prototype •
+        Human clinical judgment required
+    </div>
+    """,
+    unsafe_allow_html=True
 )

@@ -131,8 +131,6 @@ elif page == "➕ New Case":
             "Critical"
         ]
     )
-
-    # Create case button
     if st.button("Create Case"):
 
     urgency_score = 0

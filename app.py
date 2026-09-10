@@ -135,6 +135,58 @@ elif page == "➕ New Case":
     # Create case button
     if st.button("Create Case"):
 
+    urgency_score = 0
+
+    if urgency == "Needs monitoring":
+        urgency_score += 1
+    elif urgency == "Deteriorating":
+        urgency_score += 2
+    elif urgency == "Critical":
+        urgency_score += 3
+
+    keywords = [
+        "severe",
+        "unconscious",
+        "collapse",
+        "breathing difficulty",
+        "chest pain",
+        "shock",
+        "critical"
+    ]
+
+    for word in keywords:
+        if word in clinical_info.lower():
+            urgency_score += 2
+
+    if urgency_score >= 5:
+        final_urgency = "CRITICAL"
+    elif urgency_score >= 3:
+        final_urgency = "URGENT"
+    elif urgency_score >= 1:
+        final_urgency = "MODERATE"
+    else:
+        final_urgency = "ROUTINE"
+
+    new_case = {
+        "Patient ID": patient_id,
+        "Age": age,
+        "Health Problem": health_problem,
+        "Clinical Information": clinical_info,
+        "Urgency": final_urgency,
+        "Status": "Pending Review"
+    }
+
+    st.session_state.cases.append(new_case)
+
+    st.success("Case created successfully!")
+
+    if final_urgency == "CRITICAL":
+        st.error("🚨 CRITICAL CASE — Human clinical review required")
+    elif final_urgency == "URGENT":
+        st.warning("⚠️ URGENT CASE — Priority review required")
+    else:
+        st.info(f"Case urgency: {final_urgency}")
+
         if patient_name == "":
             st.warning("Please enter a Patient ID.")
 

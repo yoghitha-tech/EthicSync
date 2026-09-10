@@ -70,135 +70,110 @@ if page == "🏠 Dashboard":
 
 # ---------------- NEW CASE ----------------
 
-elif page == "➕ New Case":
+elif page == "New Case":
 
     st.title("➕ New Case")
+    st.write("Create a new clinical case.")
 
-    st.subheader("Patient Information")
-
-    patient_name = st.text_input("Patient ID")
+    patient_id = st.text_input("Patient ID")
 
     age = st.number_input(
-        "Age",
+        "Patient Age",
         min_value=0,
         max_value=120,
-        value=30
+        value=25
     )
 
-    st.subheader("Health Problem")
-
     health_problem = st.selectbox(
-        "Select Health Problem",
+        "Health Problem",
         [
             "Cardiovascular Diseases & Hypertension",
             "Diabetes & Metabolic Disorders",
-            "Obesity & Overweight",
             "Respiratory Diseases",
             "Neurological Disorders",
             "Mental Health Disorders",
-            "Sleep Disorders",
             "Cancer / Oncology",
             "Infectious Diseases & Sepsis",
-            "Antimicrobial Resistance (AMR)",
             "Trauma & Severe Injuries",
             "Organ Failure & Critical Conditions",
-            "Severe Burns",
-            "Post-operative / Surgical Complications",
-            "Digestive & Gastrointestinal Disorders",
-            "Nutritional & Vitamin/Mineral Deficiencies",
-            "Eye & Vision Disorders",
-            "Musculoskeletal Disorders",
-            "Allergies & Autoimmune Disorders",
-            "Maternal & Obstetric Emergencies",
-            "Pediatric / Neonatal Conditions",
-            "Pollution & Environmental-Related Illnesses",
             "Other / Unclassified Clinical Condition"
         ]
     )
 
-    st.subheader("Clinical Information")
-
     clinical_info = st.text_area(
-        "Enter relevant clinical information"
+        "Clinical Information"
     )
 
     urgency = st.selectbox(
-        "Urgency of Patient Care",
+        "Current Clinical Status",
         [
-            "Routine",
-            "Moderate",
-            "Urgent",
+            "Stable",
+            "Needs monitoring",
+            "Deteriorating",
             "Critical"
         ]
     )
+
     if st.button("Create Case"):
+
         urgency_score = 0
-    if urgency == "Needs monitoring":
-        urgency_score += 1
-    elif urgency == "Deteriorating":
-        urgency_score += 2
-    elif urgency == "Critical":
-        urgency_score += 3
 
-    keywords = [
-        "severe",
-        "unconscious",
-        "collapse",
-        "breathing difficulty",
-        "chest pain",
-        "shock",
-        "critical"
-    ]
+        if urgency == "Needs monitoring":
+            urgency_score += 1
 
-    for word in keywords:
-        if word in clinical_info.lower():
+        elif urgency == "Deteriorating":
             urgency_score += 2
 
-    if urgency_score >= 5:
-        final_urgency = "CRITICAL"
-    elif urgency_score >= 3:
-        final_urgency = "URGENT"
-    elif urgency_score >= 1:
-        final_urgency = "MODERATE"
-    else:
-        final_urgency = "ROUTINE"
+        elif urgency == "Critical":
+            urgency_score += 3
 
-    new_case = {
-        "Patient ID": patient_id,
-        "Age": age,
-        "Health Problem": health_problem,
-        "Clinical Information": clinical_info,
-        "Urgency": final_urgency,
-        "Status": "Pending Review"
-    }
+        keywords = [
+            "severe",
+            "unconscious",
+            "collapse",
+            "breathing difficulty",
+            "chest pain",
+            "shock",
+            "critical"
+        ]
 
-    st.session_state.cases.append(new_case)
+        for word in keywords:
+            if word in clinical_info.lower():
+                urgency_score += 2
 
-    st.success("Case created successfully!")
+        if urgency_score >= 5:
+            final_urgency = "CRITICAL"
 
-    if final_urgency == "CRITICAL":
-        st.error("🚨 CRITICAL CASE — Human clinical review required")
-    elif final_urgency == "URGENT":
-        st.warning("⚠️ URGENT CASE — Priority review required")
-    else:
-        st.info(f"Case urgency: {final_urgency}")
+        elif urgency_score >= 3:
+            final_urgency = "URGENT"
 
-        if patient_name == "":
-            st.warning("Please enter a Patient ID.")
+        elif urgency_score >= 1:
+            final_urgency = "MODERATE"
 
         else:
+            final_urgency = "ROUTINE"
 
-            new_case = {
-                "patient": patient_name,
-                "age": age,
-                "health_problem": health_problem,
-                "clinical_info": clinical_info,
-                "urgency": urgency
-            }
+        new_case = {
+            "Patient ID": patient_id,
+            "Age": age,
+            "Health Problem": health_problem,
+            "Clinical Information": clinical_info,
+            "Urgency": final_urgency,
+            "Status": "Pending Review"
+        }
 
-            st.session_state.cases.append(new_case)
+        st.session_state.cases.append(new_case)
 
-            st.success("Case created successfully! ✅")
+        st.success("Case created successfully!")
+
+        if final_urgency == "CRITICAL":
+            st.error("🚨 CRITICAL CASE — Human clinical review required")
+
+        elif final_urgency == "URGENT":
+            st.warning("⚠️ URGENT CASE — Priority review required")
+
+        else:
+            st.info("Case urgency: " + final_urgency)
 
 
 # ---------------- CASES ----------------

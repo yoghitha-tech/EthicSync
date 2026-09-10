@@ -1,7 +1,252 @@
-elif page == "➕ New Case":
-    patient_name = st.text_input(...)
+import streamlit as st
 
-# ❌ Now we're outside New Case
-if st.button("Create Case"):
-    if patient_name == "":
-        st.write("Urgency:", urgency)
+st.set_page_config(
+    page_title="EthicSync",
+    page_icon="⚖️",
+    layout="wide"
+)
+
+# Store cases
+if "cases" not in st.session_state:
+    st.session_state.cases = []
+
+
+# ---------------- SIDEBAR ----------------
+
+st.sidebar.title("⚖️ EthicSync")
+st.sidebar.write("Ethical Clinical Decision Support System")
+
+page = st.sidebar.radio(
+    "Navigation",
+    [
+        "🏠 Dashboard",
+        "➕ New Case",
+        "📁 Cases",
+        "🚨 Patient Care Urgency",
+        "🩺 Clinical Information",
+        "🤖 AI Decision Support",
+        "📊 MCDM Analysis",
+        "⚖️ Trade-off Analysis",
+        "👥 Stakeholder Opinions",
+        "🤝 Consensus Management",
+        "🔍 Decision Transparency",
+        "👤 Final Human Decision",
+        "📝 Audit Trail",
+        "🔔 Notifications",
+        "⚙️ Settings"
+    ]
+)
+
+
+# ---------------- DASHBOARD ----------------
+
+if page == "🏠 Dashboard":
+
+    st.title("🏠 Dashboard")
+    st.subheader("Overall Case Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Active Cases", len(st.session_state.cases))
+
+    with col2:
+        st.metric("Pending Reviews", 5)
+
+    with col3:
+        st.metric("Urgent Cases", 3)
+
+    with col4:
+        st.metric("Consensus", "78%")
+
+    st.divider()
+
+    st.subheader("Recent Activity")
+
+    st.write("🟢 Clinical review completed")
+    st.write("🟡 Case awaiting stakeholder opinion")
+    st.write("🔴 Urgent human review required")
+
+
+# ---------------- NEW CASE ----------------
+
+elif page == "➕ New Case":
+
+    st.title("➕ New Case")
+
+    st.subheader("Patient Information")
+
+    patient_name = st.text_input("Patient ID")
+
+    age = st.number_input(
+        "Age",
+        min_value=0,
+        max_value=120,
+        value=30
+    )
+
+    st.subheader("Health Problem")
+
+    health_problem = st.selectbox(
+        "Select Health Problem",
+        [
+            "Cardiovascular Diseases & Hypertension",
+            "Diabetes & Metabolic Disorders",
+            "Obesity & Overweight",
+            "Respiratory Diseases",
+            "Neurological Disorders",
+            "Mental Health Disorders",
+            "Sleep Disorders",
+            "Cancer / Oncology",
+            "Infectious Diseases & Sepsis",
+            "Antimicrobial Resistance (AMR)",
+            "Trauma & Severe Injuries",
+            "Organ Failure & Critical Conditions",
+            "Severe Burns",
+            "Post-operative / Surgical Complications",
+            "Digestive & Gastrointestinal Disorders",
+            "Nutritional & Vitamin/Mineral Deficiencies",
+            "Eye & Vision Disorders",
+            "Musculoskeletal Disorders",
+            "Allergies & Autoimmune Disorders",
+            "Maternal & Obstetric Emergencies",
+            "Pediatric / Neonatal Conditions",
+            "Pollution & Environmental-Related Illnesses",
+            "Other / Unclassified Clinical Condition"
+        ]
+    )
+
+    st.subheader("Clinical Information")
+
+    clinical_info = st.text_area(
+        "Enter relevant clinical information"
+    )
+
+    urgency = st.selectbox(
+        "Urgency of Patient Care",
+        [
+            "Routine",
+            "Moderate",
+            "Urgent",
+            "Critical"
+        ]
+    )
+
+    # Create case button
+    if st.button("Create Case"):
+
+        if patient_name == "":
+            st.warning("Please enter a Patient ID.")
+
+        else:
+
+            new_case = {
+                "patient": patient_name,
+                "age": age,
+                "health_problem": health_problem,
+                "clinical_info": clinical_info,
+                "urgency": urgency
+            }
+
+            st.session_state.cases.append(new_case)
+
+            st.success("Case created successfully! ✅")
+
+
+# ---------------- CASES ----------------
+
+elif page == "📁 Cases":
+
+    st.title("📁 Cases")
+
+    if len(st.session_state.cases) == 0:
+
+        st.info("No cases have been created yet.")
+
+    else:
+
+        for i, case in enumerate(st.session_state.cases):
+
+            st.subheader("Case " + str(i + 1))
+
+            st.write("Patient ID:", case["patient"])
+            st.write("Age:", case["age"])
+            st.write("Health Problem:", case["health_problem"])
+            st.write("Clinical Information:", case["clinical_info"])
+            st.write("Urgency:", case["urgency"])
+
+            st.divider()
+
+
+# ---------------- OTHER PAGES ----------------
+
+elif page == "🚨 Patient Care Urgency":
+
+    st.title("🚨 Patient Care Urgency")
+    st.write("Urgency assessment will be developed next.")
+
+
+elif page == "🩺 Clinical Information":
+
+    st.title("🩺 Clinical Information")
+    st.write("Clinical information analysis will be developed next.")
+
+
+elif page == "🤖 AI Decision Support":
+
+    st.title("🤖 AI Decision Support")
+    st.write("AI decision support will be developed next.")
+
+
+elif page == "📊 MCDM Analysis":
+
+    st.title("📊 MCDM Analysis")
+    st.write("MCDM analysis will be developed next.")
+
+
+elif page == "⚖️ Trade-off Analysis":
+
+    st.title("⚖️ Trade-off Analysis")
+    st.write("Trade-off analysis will be developed next.")
+
+
+elif page == "👥 Stakeholder Opinions":
+
+    st.title("👥 Stakeholder Opinions")
+    st.write("Stakeholder opinion system will be developed next.")
+
+
+elif page == "🤝 Consensus Management":
+
+    st.title("🤝 Consensus Management")
+    st.write("Consensus management will be developed next.")
+
+
+elif page == "🔍 Decision Transparency":
+
+    st.title("🔍 Decision Transparency")
+    st.write("Decision transparency will be developed next.")
+
+
+elif page == "👤 Final Human Decision":
+
+    st.title("👤 Final Human Decision")
+    st.write("Final human decision module will be developed next.")
+
+
+elif page == "📝 Audit Trail":
+
+    st.title("📝 Audit Trail")
+    st.write("Audit trail will be developed next.")
+
+
+elif page == "🔔 Notifications":
+
+    st.title("🔔 Notifications")
+    st.write("Notifications will be developed next.")
+
+
+elif page == "⚙️ Settings":
+
+    st.title("⚙️ Settings")
+    st.write("Settings will be developed next.")

@@ -183,7 +183,98 @@ elif page == "📁 Cases":
 elif page == "🚨 Patient Care Urgency":
 
     st.title("🚨 Patient Care Urgency")
-    st.write("Urgency assessment will be developed next.")
+
+    st.subheader("Urgency Assessment")
+
+    symptoms = st.text_area(
+        "Enter clinical signs or symptoms"
+    )
+
+    vital_status = st.selectbox(
+        "Current clinical status",
+        [
+            "Stable",
+            "Needs monitoring",
+            "Deteriorating",
+            "Critical"
+        ]
+    )
+
+    time_sensitive = st.selectbox(
+        "Is the situation time-sensitive?",
+        [
+            "No",
+            "Yes"
+        ]
+    )
+
+    if st.button("Assess Urgency"):
+
+        urgency_score = 0
+
+        # Check clinical status
+        if vital_status == "Needs monitoring":
+            urgency_score += 1
+
+        elif vital_status == "Deteriorating":
+            urgency_score += 2
+
+        elif vital_status == "Critical":
+            urgency_score += 3
+
+        # Check time sensitivity
+        if time_sensitive == "Yes":
+            urgency_score += 2
+
+        # Check keywords
+        text = symptoms.lower()
+
+        critical_words = [
+            "severe",
+            "unconscious",
+            "collapse",
+            "breathing difficulty",
+            "chest pain",
+            "shock",
+            "critical"
+        ]
+
+        for word in critical_words:
+
+            if word in text:
+                urgency_score += 2
+
+        # Determine urgency
+        if urgency_score >= 5:
+
+            urgency = "CRITICAL"
+            st.error("🚨 CRITICAL — Immediate human clinical review required.")
+
+        elif urgency_score >= 3:
+
+            urgency = "URGENT"
+            st.warning("⚠️ URGENT — Prompt clinical review recommended.")
+
+        elif urgency_score >= 1:
+
+            urgency = "MODERATE"
+            st.info("🟡 MODERATE — Clinical monitoring/review recommended.")
+
+        else:
+
+            urgency = "ROUTINE"
+            st.success("🟢 ROUTINE — No immediate urgency detected by the prototype rules.")
+
+        st.write("### Assessment Result")
+
+        st.metric(
+            "Urgency Level",
+            urgency
+        )
+
+        st.caption(
+            "Prototype rule-based assessment. Final clinical decisions require qualified human review."
+        )
 
 
 elif page == "🩺 Clinical Information":
